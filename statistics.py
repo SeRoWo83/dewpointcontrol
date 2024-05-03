@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-'''
-    Copyright © 2016 Daniel Müllner <http://danifold.net>
-    All changes from 2017-12-27 on: Copyright © Google Inc. <http://google.com>
+"""
+    Copyright © 2016 Daniel Müllner <https://danifold.net>
+    All changes from 2017-12-27 on: Copyright © Google Inc. <https://google.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program. If not, see <http://www.gnu.org/licenses/>.
-'''
+    along with this program. If not, see <https://www.gnu.org/licenses/>.
+"""
 import sys
 if sys.hexversion < 0x03000000:
     from ConfigParser import RawConfigParser

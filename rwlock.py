@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-'''
-    Copyright © 2016 Daniel Müllner <http://danifold.net>
-    All changes from 2017-12-27 on: Copyright © Google Inc. <http://google.com>
+"""
+    Copyright © 2016 Daniel Müllner <https://danifold.net>
+    All changes from 2017-12-27 on: Copyright © Google Inc. <https://google.com>
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -19,8 +19,8 @@
 
 
     Modified version of code by Mateusz Kobos.
-    Original source: http://code.activestate.com/recipes/577803
-'''
+    Original source: https://code.activestate.com/recipes/577803
+"""
 import threading
 
 class _LockInterface:
