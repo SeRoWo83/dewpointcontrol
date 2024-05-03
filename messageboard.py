@@ -18,8 +18,9 @@
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
+from typing import Callable
+from weakref import ref
 from collections import OrderedDict
-import weakref
 
 from rwlock import RWLock, RWLockReaderPriority
 
@@ -31,7 +32,7 @@ class MessageBoard:
         self.subscriptions: dict[str, ...] = {}
         self.subscription_lock: RWLockReaderPriority = RWLockReaderPriority()
 
-    def post(self, heading: str, message):
+    def post(self, heading: str, message) -> None:
         with self.message_lock.write_access:
             self.messages[heading] = message
         with self.subscription_lock.read_access:
@@ -41,37 +42,37 @@ class MessageBoard:
                     if instance is not None:
                         callback(instance, message)
 
-    def query(self, heading: str):
+    def query(self, heading: str) -> ...:
         with self.message_lock.read_access:
             if heading in self.messages:
                 return self.messages[heading]
 
-    def subscribe(self, heading: str, instance, callback):
+    def subscribe(self, heading: str, instance: object, callback: Callable) -> None:
         with self.subscription_lock.write_access:
             if heading not in self.subscriptions:
                 self.subscriptions[heading] = OrderedDict()
-            wr = weakref.ref(instance)
+            wr = ref(instance)
             assert wr not in self.subscriptions[heading]
             self.subscriptions[heading][wr] = callback
 
-    def unsubscribe(self, heading: str, instance):
+    def unsubscribe(self, heading: str, instance: object) -> None:
         with self.subscription_lock.write_access:
-            wr = weakref.ref(instance)
+            wr = ref(instance)
             if heading in self.subscriptions and wr in self.subscriptions[heading]:
                 del self.subscriptions[heading][wr]
             if not self.subscriptions[heading]:
                 del self.subscriptions[heading]
 
-    def unsubscribe_all(self, instance):
+    def unsubscribe_all(self, instance: object) -> None:
         with self.subscription_lock.write_access:
-            wr = weakref.ref(instance)
+            wr = ref(instance)
             for heading in list(self.subscriptions):
                 if wr in self.subscriptions[heading]:
                     del self.subscriptions[heading][wr]
                 if not self.subscriptions[heading]:
                     del self.subscriptions[heading]
 
-    def ask(self, heading: str, message):
+    def ask(self, heading: str, message) -> ...:
         with self.subscription_lock.read_access:
             if heading in self.subscriptions:
                 for wr, callback in self.subscriptions[heading].items():
