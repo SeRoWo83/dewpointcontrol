@@ -17,23 +17,22 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-else:
-    from configparser import RawConfigParser
-from datetime import datetime
-import logging
-from threading import Event
-import time
 
-from component import ComponentWithThread
+import logging
+from time import struct_time
+from configparser import RawConfigParser
+from datetime import datetime
+from threading import Event
+
 import sht75
-from uptime import Uptime
+from uptime import uptime
+from component import ComponentWithThread
+
+from misc import CSV, delay
 
 logger = logging.getLogger('fancontrol')
 
-config = RawConfigParser()
+config: RawConfigParser = RawConfigParser()
 config.read('fancontrol.cfg')
 clock1 = config.getint('pins', 'sensor1_clock')
 data1 = config.getint('pins', 'sensor1_data')
@@ -43,44 +42,30 @@ data2 = config.getint('pins', 'sensor2_data')
 measure_interval = config.getint('measure', 'interval')
 assert measure_interval >= 1
 
-class csv:
-    def __init__(self, *args):
-        self.args = args
-
-    def __str__(self):
-        return ','.join(map(str, self.args))
-
-def delay(seconds):
-    time0 = Uptime()
-    sleeptime = seconds
-    while sleeptime > 0:
-        time.sleep(sleeptime)
-        time1 = Uptime()
-        sleeptime = seconds - time1 + time0
 
 class Sensor(ComponentWithThread):
     def __init__(self):
-        ComponentWithThread.__init__(self, 'sensor')
+        ut = uptime()
+        super().__init__('sensor')
         self.S1 = sht75.Sensor(clock1, data1)
         self.S2 = sht75.Sensor(clock2, data2)
         self.event = Event()
-        self.lastmeasurement = Uptime()
+        self.last_measurement = ut
+        self.uptime = ut
 
     def __enter__(self):
-        self.messageboard.subscribe('Time', self, Sensor.onTime)
-        return ComponentWithThread.__enter__(self)
+        self.messageboard.subscribe('Time', self, Sensor.on_time)
+        return super().__enter__()
 
-    def onTime(self, message):
-        self.uptime, localtime = message
-        if self.uptime > self.lastmeasurement + 10.5:
-            logger.warning('Interval between measurements > 10.5s: {}, {}.'.
-                           format(self.lastmeasurement, self.uptime))
-        if int(self.uptime) % measure_interval == 0 \
-           or self.uptime > self.lastmeasurement + 10.5:
-            self.lastmeasurement = self.uptime
+    def on_time(self, message: tuple[float, struct_time]) -> None:
+        self.uptime, _ = message
+        if self.uptime > self.last_measurement + 10.5:
+            logger.warning(f'Interval between measurements > 10.5s: {self.last_measurement}, {self.uptime}.')
+        if int(self.uptime) % measure_interval == 0 or self.uptime > self.last_measurement + 10.5:
+            self.last_measurement = self.uptime
             self.event.set()
 
-    def run(self):
+    def run(self) -> None:
         while self.messageboard.query('ExitThread') is None:
             if self.event.wait(1):
                 self.event.clear()
@@ -91,9 +76,14 @@ class Sensor(ComponentWithThread):
                 assert wait >= 0
                 assert wait < 1
                 delay(wait)
-                S1Data = self.S1.read()
-                S2Data = self.S2.read()
-                self.messageboard.post('Measurement', (self.uptime, S1Data, S2Data))
-                logger.info(csv('measurement',
-                                S1Data.rH, S1Data.T, S1Data.tau, S1Data.Error,
-                                S2Data.rH, S2Data.T, S2Data.tau, S2Data.Error))
+                s1_data = self.S1.read()
+                s2_data = self.S2.read()
+                self.messageboard.post('Measurement', (self.uptime, s1_data, s2_data))
+                logger.info(CSV('measurement',
+                                s1_data.rH, s1_data.T, s1_data.tau, s1_data.Error,
+                                s2_data.rH, s2_data.T, s2_data.tau, s2_data.Error))
+
+
+if __name__ == '__main__':
+    with Sensor() as my_sensor:
+        delay(2)

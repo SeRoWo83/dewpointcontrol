@@ -17,51 +17,53 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
 from collections import OrderedDict
 import weakref
 
 from rwlock import RWLock, RWLockReaderPriority
 
+
 class MessageBoard:
     def __init__(self):
-        self.messages = {}
-        self.messageLock = RWLock()
-        self.subscriptions = {}
-        self.subscriptionLock = RWLockReaderPriority()
+        self.messages: dict[str, ...] = {}
+        self.message_lock: RWLock = RWLock()
+        self.subscriptions: dict[str, ...] = {}
+        self.subscription_lock: RWLockReaderPriority = RWLockReaderPriority()
 
-    def post(self, heading, message):
-        with self.messageLock.write_access:
+    def post(self, heading: str, message):
+        with self.message_lock.write_access:
             self.messages[heading] = message
-        with self.subscriptionLock.read_access:
+        with self.subscription_lock.read_access:
             if heading in self.subscriptions:
-                for wr, callback in self.subscriptions[heading].iteritems():
+                for wr, callback in self.subscriptions[heading].items():
                     instance = wr()
                     if instance is not None:
                         callback(instance, message)
 
-    def query(self, heading):
-        with self.messageLock.read_access:
+    def query(self, heading: str):
+        with self.message_lock.read_access:
             if heading in self.messages:
                 return self.messages[heading]
 
-    def subscribe(self, heading, instance, callback):
-        with self.subscriptionLock.write_access:
-            if not heading in self.subscriptions:
+    def subscribe(self, heading: str, instance, callback):
+        with self.subscription_lock.write_access:
+            if heading not in self.subscriptions:
                 self.subscriptions[heading] = OrderedDict()
             wr = weakref.ref(instance)
             assert wr not in self.subscriptions[heading]
             self.subscriptions[heading][wr] = callback
 
-    def unsubscribe(self, heading, instance):
-        with self.subscriptionLock.write_access:
+    def unsubscribe(self, heading: str, instance):
+        with self.subscription_lock.write_access:
             wr = weakref.ref(instance)
             if heading in self.subscriptions and wr in self.subscriptions[heading]:
                 del self.subscriptions[heading][wr]
             if not self.subscriptions[heading]:
                 del self.subscriptions[heading]
 
-    def unsubscribeAll(self, instance):
-        with self.subscriptionLock.write_access:
+    def unsubscribe_all(self, instance):
+        with self.subscription_lock.write_access:
             wr = weakref.ref(instance)
             for heading in list(self.subscriptions):
                 if wr in self.subscriptions[heading]:
@@ -69,12 +71,13 @@ class MessageBoard:
                 if not self.subscriptions[heading]:
                     del self.subscriptions[heading]
 
-    def ask(self, heading, message):
-        with self.subscriptionLock.read_access:
+    def ask(self, heading: str, message):
+        with self.subscription_lock.read_access:
             if heading in self.subscriptions:
-                for wr, callback in self.subscriptions[heading].iteritems():
+                for wr, callback in self.subscriptions[heading].items():
                     instance = wr()
                     if instance is not None:
                         return callback(instance, message)
 
-messageboard = MessageBoard()
+
+message_board = MessageBoard()

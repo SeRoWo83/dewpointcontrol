@@ -1,4 +1,7 @@
-import time
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from time import sleep
 
 from uptime import uptime
 
@@ -15,6 +18,6 @@ def delay(seconds):
     time0 = uptime()
     sleep_time = seconds
     while sleep_time > 0:
-        time.sleep(sleep_time)
+        sleep(sleep_time)
         time1 = uptime()
-        sleep_time = seconds - time1 + time0
+        sleep_time = seconds + time0 - time1
