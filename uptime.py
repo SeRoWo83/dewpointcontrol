@@ -18,43 +18,12 @@
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from typing import TextIO
-from threading import Lock
 from time import clock_gettime, CLOCK_BOOTTIME
-
-
-class _Uptimefile:
-    def __init__(self):
-        self.f: TextIO = open("/proc/uptime", 'r').__enter__()
-
-    def __del__(self):
-        print('Close file /proc/uptime.')
-        self.f.__exit__()
-
-    def file(self):
-        return self.f
-
-
-_uptime_file: _Uptimefile = _Uptimefile()
-_f: TextIO = _uptime_file.file()
-_lock: Lock = Lock()
-
-
-def uptime_as_string_old():
-    # Uptime in Seconds
-    with _lock:
-        _f.seek(0)
-        return _f.read().split()[0]
-
-
-def uptime_old():
-    # Uptime in Seconds
-    return float(uptime_as_string_old())
 
 
 def uptime() -> float:
     # Uptime in Seconds
-    return round(clock_gettime(CLOCK_BOOTTIME), 3)  # TODO: maybe keep precision
+    return clock_gettime(CLOCK_BOOTTIME)
 
 
 def uptime_as_string() -> str:
@@ -63,12 +32,8 @@ def uptime_as_string() -> str:
 
 if __name__ == '__main__':
     from timeit import default_timer as timer
-    print(f"{uptime_as_string_old()=}")
-    print(f"{uptime_as_string()    =}")  # noqa
+    print(f"{uptime_as_string()=}")
     start: float = timer()
-    print(f"{uptime_old()=}")
-    mid: float = timer()
-    print(f"{uptime()    =}")  # noqa
+    print(f"{uptime()=}")
     end: float = timer()
-    print(f"uptime_old() duration: {mid-start:.8f}s")
-    print(f"uptime() duration:     {end-mid:.8f}s")
+    print(f"uptime() duration: {end-start:.8f}s")
