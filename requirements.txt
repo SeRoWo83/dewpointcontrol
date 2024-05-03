@@ -1,0 +1,8 @@
+mypy
+numpy
+lxml
+requests
+psutil
+pygame
+dbus-python
+RPi.GPIO
