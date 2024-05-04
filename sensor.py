@@ -44,7 +44,7 @@ assert measure_interval >= 1
 
 
 class Sensor(ComponentWithThread):
-    def __init__(self):
+    def __init__(self) -> None:
         ut = uptime()
         super().__init__('sensor')
         self.S1 = sht75.Sensor(clock1, data1)
@@ -53,8 +53,8 @@ class Sensor(ComponentWithThread):
         self.last_measurement = ut
         self.uptime = ut
 
-    def __enter__(self):
-        self.messageboard.subscribe('Time', self, Sensor.on_time)
+    def __enter__(self) -> object:
+        self.message_board.subscribe('Time', self, Sensor.on_time)
         return super().__enter__()
 
     def on_time(self, message: tuple[float, struct_time]) -> None:
@@ -66,7 +66,7 @@ class Sensor(ComponentWithThread):
             self.event.set()
 
     def run(self) -> None:
-        while self.messageboard.query('ExitThread') is None:
+        while self.message_board.query('ExitThread') is None:
             if self.event.wait(1):
                 self.event.clear()
                 # Start measurement approx. 250 ms after the full second.
@@ -80,8 +80,8 @@ class Sensor(ComponentWithThread):
                 s2_data = self.S2.read()
                 self.messageboard.post('Measurement', (self.uptime, s1_data, s2_data))
                 logger.info(CSV('measurement',
-                                s1_data.rH, s1_data.T, s1_data.tau, s1_data.Error,
-                                s2_data.rH, s2_data.T, s2_data.tau, s2_data.Error))
+                                s1_data.humidity, s1_data.temperature, s1_data.tau, s1_data.error,
+                                s2_data.humidity, s2_data.temperature, s2_data.tau, s2_data.error))
 
 
 if __name__ == '__main__':
