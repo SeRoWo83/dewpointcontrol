@@ -17,13 +17,11 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-else:
-    from configparser import RawConfigParser
+
 import logging
 from math import expm1
+from time import struct_time
+from configparser import RawConfigParser
 
 from component import Component
 
@@ -35,22 +33,23 @@ config = RawConfigParser()
 config.read('fancontrol.cfg')
 ventilation_period = config.getfloat('fan', 'ventilation_period')
 
+
 class Fan(Component):
-    def __init__(self):
-        Component.__init__(self, 'fan')
+    def __init__(self) -> None:
+        super().__init__('fan')
         self.mode = None
         self.fanState = None
         self.lastOff = None
         self.stayOnUntil = 0
         self.stayOffUntil = 0
 
-    def __enter__(self):
+    def __enter__(self) -> object:
         with self.lock:
-            self.messageboard.subscribe('Mode', self, Fan.onMode)
-            self.messageboard.subscribe('Time', self, Fan.onTime)
-        return Component.__enter__(self)
+            self.message_board.subscribe('Mode', self, Fan.on_mode)
+            self.message_board.subscribe('Time', self, Fan.on_time)
+        return super().__enter__()
 
-    def onMode(self, message):
+    def on_mode(self, message) -> None:
         with self.lock:
             self.mode = message
             assert self.mode in ('auto', 'manual')
@@ -60,87 +59,77 @@ class Fan(Component):
                 self.stayOnUntil = 0
                 self.stayOffUntil = 0
 
-    def decideFan(self, uptime):
+    def decide_fan(self, uptime: float) -> bool:
         if self.stayOffUntil > uptime:
             return False
 
-        average1 = self.messageboard.ask('Average', 60)
-        average10 = self.messageboard.ask('Average', 60 * 10)
+        average1 = self.message_board.ask('Average', 60)
+        average10 = self.message_board.ask('Average', 60 * 10)
 
         if average1 is None or average10 is None:
             logger.error('fan, Average is None.')
-            self.messageboard.post('FanComment',
-                                   'Error!')
+            self.message_board.post('FanComment', 'Error!')
             return False
 
-        S1Data = average1[0]
-        S2Data = average10[1]
-        if S1Data.Error or S2Data.Error:
-            self.messageboard.post('FanComment',
-                                   'Not enough samples for average.')
+        s1_data = average1[0]
+        s2_data = average10[1]
+        if s1_data.error or s2_data.error:
+            self.message_board.post('FanComment', 'Not enough samples for average.')
             return False
 
-        if S1Data.tau - S2Data.tau < 1:
-            self.messageboard.post('FanComment',
-                                   'High outside dew point.')
-            self.stayOffUntil = uptime + 20*60
+        if s1_data.tau - s2_data.tau < 1:
+            self.message_board.post('FanComment', 'High outside dew point.')
+            self.stayOffUntil = uptime + 20 * 60
             return False
 
-        if S1Data.T < S2Data.T:
-            self.messageboard.post('FanComment',
-                                   'Permanent ventilation: warm and dry outside.')
-            self.stayOnUntil = uptime + 20*60
+        if s1_data.temperature < s2_data.temperature:
+            self.message_board.post('FanComment', 'Permanent ventilation: warm and dry outside.')
+            self.stayOnUntil = uptime + 20 * 60
             return True
 
-        if S1Data.T < 10:
-            self.messageboard.post('FanComment',
-                                   'Low room temperature.')
-            self.stayOffUntil = uptime + 20*60
+        if s1_data.temperature < 10:
+            self.message_board.post('FanComment', 'Low room temperature.')
+            self.stayOffUntil = uptime + 20 * 60
             return False
 
-        remainingVentilationPeriod = self.stayOnUntil - uptime
-        if remainingVentilationPeriod > 0:
-            self.messageboard.post('FanComment',
-                                   'Remaing ventilation period: {} min.'.format(int(remainingVentilationPeriod / 60.0 + .5)))
+        remaining_ventilation_period = self.stayOnUntil - uptime
+        if remaining_ventilation_period > 0:
+            self.message_board.post('FanComment',
+                                    f'Remaing ventilation period: {int(remaining_ventilation_period / 60.0 + .5)} min.')
             return True
 
-        #offSeconds = expm1((15.0 - S2Data.T) /  6.0) * 20 * 60
-        offSeconds = expm1((15.0 - S2Data.T) / 10.0) * 45 * 60
-        #offSeconds = expm1((15.0 - S2Data.T) / 12.0) * 60 * 60
+        off_seconds = expm1((15.0 - s2_data.temperature) / 10.0) * 45 * 60
 
-        if offSeconds < 60:
-            offSeconds = 0
-        if not (offSeconds <= 86400):
-            offSeconds = 86400
+        if off_seconds < 60:
+            off_seconds = 0
+        if off_seconds > 86400:
+            off_seconds = 86400
         if self.lastOff is None:
-            remainingWaitPeriod = offSeconds
+            remaining_wait_period = off_seconds
         else:
-            remainingWaitPeriod = max(0, offSeconds - uptime + self.lastOff)
-        self.messageboard.post('FanComment',
-                               'Wait period: {} min ({} min remaining).'.
-                               format(
-                                   int(offSeconds / 60.0 + .5),
-                                   int(remainingWaitPeriod / 60.0 + .5)))
-        self.messageboard.post('WaitPeriod', offSeconds)
-        self.messageboard.post('RemainingWaitPeriod', remainingWaitPeriod)
-        fanState = remainingWaitPeriod == 0
-        if fanState:
-            self.stayOnUntil = uptime + 20*60
-        return fanState
+            remaining_wait_period = max(0, off_seconds - uptime + self.lastOff)
+        self.message_board.post('FanComment', f'Wait period: {int(off_seconds / 60.0 + .5)} min '
+                                              f'({int(remaining_wait_period / 60.0 + .5)} min remaining).')
+        self.message_board.post('WaitPeriod', off_seconds)
+        self.message_board.post('RemainingWaitPeriod', remaining_wait_period)
+        fan_state = remaining_wait_period == 0
+        if fan_state:
+            self.stayOnUntil = uptime + 20 * 60
+        return fan_state
 
-    def onTime(self, message):
+    def on_time(self, message: tuple[float, struct_time]) -> None:
         with self.lock:
             if self.mode == 'manual':
                 return
-            uptime, localtime = message
-            action = self.decideFan(uptime)
+            uptime, _ = message
+            action: bool = self.decide_fan(uptime)
 
             if action != self.fanState:
                 self.fanState = action
-                logger.info('fan,{}'.format(action))
+                logger.info(f'fan,{action}')
                 if action:
-                    self.messageboard.post('Devices', 'VentilationOn')
+                    self.message_board.post('Devices', 'VentilationOn')
                     self.lastOff = None
                 else:
-                    self.messageboard.post('Devices', 'VentilationOff')
+                    self.message_board.post('Devices', 'VentilationOff')
                     self.lastOff = uptime
