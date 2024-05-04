@@ -25,7 +25,8 @@ from threading import currentThread
 
 logger = logging.getLogger('fancontrol')
 
-class signals_handler:
+
+class SignalsHandler:
     def __init__(self, messageboard):
         self.messageboard = messageboard
         signal.signal(signal.SIGINT, self.generate_sigint_handler())
