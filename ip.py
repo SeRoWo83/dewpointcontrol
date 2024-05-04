@@ -17,34 +17,36 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-import fcntl
-import requests
-import socket
-import struct
 
-def get_ip_address(ifname='wlan0'):
-    'Source: http://code.activestate.com/recipes/439094/'
+from fcntl import ioctl
+from socket import socket, AF_INET, SOCK_DGRAM, inet_ntoa
+from struct import pack
+from requests import Response, get as url_get
+
+
+def get_ip_address(if_name: str = 'wlan0') -> str:
+    # Source: https://code.activestate.com/recipes/439094/
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        return socket.inet_ntoa(fcntl.ioctl(
-            s.fileno(),
-            0x8915,  # SIOCGIFADDR
-            struct.pack('256s', ifname[:15])
-        )[20:24])
+        with socket(AF_INET, SOCK_DGRAM) as s:
+            return inet_ntoa(ioctl(s.fileno(), 0x8915,  # SIOCGIFADDR
+                                   pack('256s', if_name[:15].encode('utf-8')))[20:24])
     except IOError:
         return 'None'
 
-def get_wan_ip():
+
+def get_wan_ip() -> str:
     try:
-        r = requests.get('http://whatismyip.akamai.com', timeout=1, stream=True)
+        r: Response = url_get('https://whatismyip.akamai.com', timeout=1, stream=True)
         # Validate the result: a plain text ip address.
-        ip = r.raw.read(15)
+        ip = r.raw.read(15).decode()
         for c in ip:
-            if not c in '0123456789.':
+            if c not in '0123456789.':
                 return 'Error'
         return ip
     except:
         return 'Error'
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     print(get_ip_address())
+    print(get_wan_ip())
