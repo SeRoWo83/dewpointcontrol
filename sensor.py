@@ -78,7 +78,7 @@ class Sensor(ComponentWithThread):
                 delay(wait)
                 s1_data = self.S1.read()
                 s2_data = self.S2.read()
-                self.messageboard.post('Measurement', (self.uptime, s1_data, s2_data))
+                self.message_board.post('Measurement', (self.uptime, s1_data, s2_data))
                 logger.info(CSV('measurement',
                                 s1_data.humidity, s1_data.temperature, s1_data.tau, s1_data.error,
                                 s2_data.humidity, s2_data.temperature, s2_data.tau, s2_data.error))
