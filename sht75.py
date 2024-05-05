@@ -249,7 +249,7 @@ class Sht(ShtComms):
            sure all coefficients match your sensor's datasheet."""
         self.voltage = voltage or self.voltage_default
         self.d1 = self.C.compute_d1(self.voltage)
-        super(Sht, self).__init__(pin_sck, pin_data)
+        super().__init__(pin_sck, pin_data)
 
     def read_t(self) -> float:
         t_raw = self._get_meas_result(self.Cmd.t)
@@ -314,4 +314,4 @@ class Sensor:
 
 if __name__ == '__main__':
     GPIO.setmode(GPIO.BOARD)
-    my_sens = Sensor(7, 11)
+    my_sens1, my_sens2 = Sensor(7, 11), Sensor(13, 15)

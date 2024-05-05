@@ -85,5 +85,7 @@ class Sensor(ComponentWithThread):
 
 
 if __name__ == '__main__':
+    import RPi.GPIO as GPIO
+    GPIO.setmode(GPIO.BOARD)
     with Sensor() as my_sensor:
         delay(2)
