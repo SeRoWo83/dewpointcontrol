@@ -31,6 +31,7 @@ from itertools import count
 from numpy import NaN
 
 from component import Component
+from messageboard import MessageBoard
 
 DEBUG = False
 
@@ -61,13 +62,18 @@ icon_offline = pygame.image.load('/usr/share/icons/HighContrast/16x16/status/net
 icon_online = pygame.image.load('/usr/share/icons/HighContrast/16x16/status/network-idle.png')
 icon_unknown = pygame.image.load('/usr/share/icons/HighContrast/16x16/status/network-no-route.png')
 
-class Bunch:
-    def __init__(self, **kwds):
-        self.__dict__.update(kwds)
+
+@dataclass
+class SensorData:
+    humidity: float = NaN
+    temperature: float = NaN
+    tau: float = NaN
+    error: bool = False
+
 
 class Screen:
-    def __init__(self, messageboard):
-        self.messageboard = messageboard
+    def __init__(self, message_board: MessageBoard) -> None:
+        self.message_board = message_board
         pygame.display.init()
         pygame.font.init()
         pygame.mouse.set_visible(0)
@@ -80,44 +86,44 @@ class Screen:
         print('Done.')
         self.font = pygame.font.SysFont(fontname, fontsize)
         self.clear()
-        NaN = float('NaN')
-        dummyMeasurement = Bunch(rH = NaN, T = NaN, tau = NaN)
-        self.set_measurements(dummyMeasurement, dummyMeasurement)
+        dummy_measurement = SensorData()
+        self.set_measurements(dummy_measurement, dummy_measurement)
         self.set_background(WHITE)
-        self.in_menu = True # Suppress display update
+        self.in_menu = True  # Suppress display update
         self.localtime = time.localtime()
         self.in_menu = False
 
-    def clear(self):
-        self.screen.fill((255,255,255))
+    def clear(self) -> None:
+        self.screen.fill((255, 255, 255))
         self.y = 0
         self.lineheight = 0
 
-    def set_background(self, color):
+    def set_background(self, color: tuple[int, int, int]) -> None:
         self.bgcolor = color
 
     def displaytext(self, text, align, color):
         text = self.font.render(text, True, color, self.bgcolor)
         textpos = text.get_rect()
         textpos.top = self.y
-        if align=='l':
-            textpos.left = 2
-        elif align=='r':
-            textpos.right = self.width - 2
-        elif align=='c2':
-            textpos.centerx = self.width * .5
-        elif align=='c3':
-            textpos.centerx = self.width * .82
-        else:
-            raise ValueError()
+        match align:
+            case 'l':
+                textpos.left = 2
+            case 'r':
+                textpos.right = self.width - 2
+            case 'c2':
+                textpos.centerx = self.width * .5
+            case 'c3':
+                textpos.centerx = self.width * .82
+            case _:
+                raise ValueError()
         self.line.append((text, textpos))
         self.lineheight = max(self.lineheight, textpos.height)
 
-    def hrule(self):
-        pygame.draw.line(self.screen, (0,0,0), (0, self.y), (self.width - 1, self.y))
+    def hrule(self) -> None:
+        pygame.draw.line(self.screen, (0, 0, 0), (0, self.y), (self.width - 1, self.y))
         self.y += 1
 
-    def linefeed(self):
+    def linefeed(self) -> None:
         self.screen.fill(self.bgcolor, pygame.Rect(0, self.y, self.width, self.lineheight))
         for surface, pos in self.line:
             self.screen.blit(surface, pos)
@@ -134,66 +140,68 @@ class Screen:
         self.screen.fill(self.bgcolor, pygame.Rect(0, textpos.top, self.width, self.height - textpos.top))
         self.screen.blit(text, textpos)
 
-    def showpage(self):
+    @staticmethod
+    def show_page() -> None:
         pygame.display.flip()
 
-    def set_time(self, localtime):
+    def set_time(self, localtime: struct_time) -> None:
         self.localtime = localtime
         if not self.in_menu:
             self.show_measurements()
-        self.messageboard.post('StatusProcessed', True)
+        self.message_board.post('StatusProcessed', True)
 
-    def set_measurements(self, S1, S2):
-        self.rH1 = S1.rH
-        self.T1 = S1.T
-        self.tau1 = S1.tau
-        self.rH2 = S2.rH
-        self.T2 = S2.T
-        self.tau2 = S2.tau
+    def set_measurements(self, sensor1: SensorData, sensor2: SensorData):
+        self.rH1 = sensor1.humidity
+        self.T1 = sensor1.temperature
+        self.tau1 = sensor1.tau
+        self.rH2 = sensor2.humidity
+        self.T2 = sensor2.temperature
+        self.tau2 = sensor2.tau
 
-    def get_fanstate(self):
-        fanstate = self.messageboard.query('FanState')
-        if fanstate == 'FanOn':
-            return u'Lüftung ist an.', (255, 127, 0)
-        elif fanstate == 'FanOff':
-            return u'Lüftung ist aus.', (0, 127, 0)
-        elif fanstate == 'OpenWindow':
-            return u'Öffne Fenster.', (255, 127, 0)
-        elif fanstate == 'CloseWindow':
-            return u'Schliesse Fenster.', (255, 127, 0)
-        else:
-            return u'Lüftung: unbekannt.', (255, 0, 0)
+    def get_fanstate(self) -> tuple[str, tuple[int, int, int]]:
+        fanstate = self.message_board.query('FanState')
+        match fanstate:
+            case 'FanOn':
+                return u'Lüftung ist an.', (255, 127, 0)
+            case 'FanOff':
+                return u'Lüftung ist aus.', (0, 127, 0)
+            case 'OpenWindow':
+                return u'Öffne Fenster.', (255, 127, 0)
+            case 'CloseWindow':
+                return u'Schliesse Fenster.', (255, 127, 0)
+            case _:
+                return u'Lüftung: unbekannt.', (255, 0, 0)
 
     @staticmethod
-    def color(x):
-        return (0,0,0) if x==x else (255,0,0)
+    def color(x: float) -> tuple[int, int, int]:
+        return (0, 0, 0) if x == x else (255, 0, 0)
 
     def show_measurements(self):
         self.clear()
-        self.displaytext(time.strftime("%d.%m.%Y", self.localtime), 'l', (0,0,0))
-        self.displaytext(time.strftime("%H:%M:%S", self.localtime), 'r', (0,0,0))
+        self.displaytext(time.strftime("%d.%m.%Y", self.localtime), 'l', (0, 0, 0))
+        self.displaytext(time.strftime("%H:%M:%S", self.localtime), 'r', (0, 0, 0))
         self.linefeed()
-        self.displaytext("Innen", 'c2', (0,0,0))
-        self.displaytext("Aussen", 'c3', (0,0,0))
+        self.displaytext("Innen", 'c2', (0, 0, 0))
+        self.displaytext("Aussen", 'c3', (0, 0, 0))
         self.linefeed()
         self.hrule()
         self.set_background(YELLOW)
-        self.displaytext("rF in %", 'l', (0,0,0))
-        self.displaytext('{:2.1f}'.format(self.rH1), 'c2', self.color(self.rH1))
-        self.displaytext('{:2.1f}'.format(self.rH2), 'c3', self.color(self.rH2))
+        self.displaytext("rF in %", 'l', (0, 0, 0))
+        self.displaytext(f'{self.rH1:2.1f}', 'c2', self.color(self.rH1))
+        self.displaytext(f'{self.rH2:2.1f}', 'c3', self.color(self.rH2))
         self.linefeed()
-        self.displaytext(u"T in °C", 'l', (0,0,0))
-        self.displaytext('{:2.1f}'.format(self.T1), 'c2', self.color(self.T1))
-        self.displaytext('{:2.1f}'.format(self.T2), 'c3', self.color(self.T2))
+        self.displaytext(u"T in °C", 'l', (0, 0, 0))
+        self.displaytext(f'{self.T1:2.1f}', 'c2', self.color(self.T1))
+        self.displaytext(f'{self.T2:2.1f}', 'c3', self.color(self.T2))
         self.linefeed()
         self.set_background(YELLOW)
-        self.displaytext(u"τ in °C", 'l', (0,0,0))
-        self.displaytext('{:2.1f}'.format(self.tau1), 'c2', self.color(self.tau1))
-        self.displaytext('{:2.1f}'.format(self.tau2), 'c3', self.color(self.tau2))
+        self.displaytext(u"τ in °C", 'l', (0, 0, 0))
+        self.displaytext(f'{self.tau1:2.1f}', 'c2', self.color(self.tau1))
+        self.displaytext(f'{self.tau2:2.1f}', 'c3', self.color(self.tau2))
         self.linefeed()
         fanstatetext, fanstatecolor = self.get_fanstate()
         self.displaytext(fanstatetext, 'l', fanstatecolor)
-        online = self.messageboard.query('Network')
+        online = self.message_board.query('Network')
         if online is None:
             icon = icon_unknown
         elif online:
@@ -205,22 +213,22 @@ class Screen:
         iconpos.right = self.width
         self.line.append((icon, iconpos))
         self.linefeed()
-        status = self.messageboard.query('Status')
+        status = self.message_board.query('Status')
         if status is not None:
             statustxt, statuscolor = status
             self.displaytext(statustxt, 'l', statuscolor)
             self.linefeed()
-        self.showpage()
+        self.show_page()
 
     def show_startscreen(self):
         self.clear()
-        self.displaytext('Fan control', 'l', (0,0,0))
+        self.displaytext('Fan control', 'l', (0, 0, 0))
         self.linefeed()
-        self.displaytext(u'by Daniel Müllner', 'l', (0,0,0))
+        self.displaytext(u'by Daniel Müllner', 'l', (0, 0, 0))
         self.linefeed()
-        self.showpage()
+        self.show_page()
 
-    def leave_menu(self):
+    def leave_menu(self) -> None:
         self.in_menu = False
         self.show_measurements()
 
@@ -228,64 +236,65 @@ class Screen:
         self.in_menu = True
         self.clear()
         for index, item in zip(count(), items):
-            if index==highlight:
-                self.set_background((127,255,127))
-            self.displaytext(item, 'l', (0,0,0))
+            if index == highlight:
+                self.set_background((127, 255, 127))
+            self.displaytext(item, 'l', (0, 0, 0))
             self.linefeed()
         if statusline:
             self.set_background(STATUSBG)
-            self.displaybottom(statusline, (50,50,255))
+            self.displaybottom(statusline, (50, 50, 255))
             self.set_background(WHITE)
-        self.showpage()
+        self.show_page()
 
     def show_info(self, items, highlight=None, statusline=None):
         self.in_menu = True
         self.clear()
         for index, item in zip(count(), items):
-            if index==highlight:
-                self.set_background((127,255,127))
-            self.displaytext(item[0], 'l', (0,0,0))
+            if index == highlight:
+                self.set_background((127, 255, 127))
+            self.displaytext(item[0], 'l', (0, 0, 0))
             if len(item) > 1:
-                self.displaytext(item[1], 'r', (0,0,0))
+                self.displaytext(item[1], 'r', (0, 0, 0))
             self.linefeed()
         if statusline:
             self.set_background(STATUSBG)
-            self.displaybottom(statusline, (50,50,255))
+            self.displaybottom(statusline, (50, 50, 255))
             self.set_background(WHITE)
-        self.showpage()
+        self.show_page()
+
 
 class Display(Component):
-    def __init__(self):
-        Component.__init__(self, 'display')
-        self.screen = Screen(self.messageboard)
+    def __init__(self) -> None:
+        super().__init__('display')
+        self.screen = Screen(self.message_board)
         self.screen.show_startscreen()
 
-    def __enter__(self):
+    def __enter__(self) -> object:
         with self.lock:
-            self.messageboard.subscribe('Measurement', self, Display.onMeasurement)
-            self.messageboard.subscribe('Time', self, Display.onTime)
-            self.messageboard.subscribe('MainScreen', self, Display.onMainScreen)
-            self.messageboard.subscribe('Menu', self, Display.onMenu)
-            self.messageboard.subscribe('Info', self, Display.onInfo)
-        return Component.__enter__(self)
+            self.message_board.subscribe('Measurement', self, Display.on_measurement)
+            self.message_board.subscribe('Time', self, Display.on_time)
+            self.message_board.subscribe('MainScreen', self, Display.on_main_screen)
+            self.message_board.subscribe('Menu', self, Display.on_menu)
+            self.message_board.subscribe('Info', self, Display.on_info)
+        return super().__enter__()
 
-    def onMeasurement(self, message):
+    def on_measurement(self, message: tuple[float, struct_time]) -> None:
         with self.lock:
             self.screen.set_measurements(*message[1:])
 
-    def onTime(self, message):
-        uptime, localtime = message
+    def on_time(self, message: tuple[float, struct_time]) -> None:
+        _, localtime = message
         with self.lock:
             self.screen.set_time(localtime)
 
-    def onMainScreen(self, message):
+    def on_main_screen(self, _: tuple[float, struct_time]) -> None:
         with self.lock:
             self.screen.leave_menu()
 
-    def onMenu(self, message):
+    def on_menu(self, message: tuple[float, struct_time]) -> None:
         with self.lock:
             self.screen.show_menu(*message)
 
-    def onInfo(self, message):
+    def on_info(self, message: tuple[float, struct_time]) -> None:
         with self.lock:
             self.screen.show_info(message)

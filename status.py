@@ -17,80 +17,84 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
+from typing import Any
+from sht75 import SensorData
 from component import Component
 
-C_ERROR = (255,0,0)
-C_OK = (0,127,0)
-C_ALERT = (0,159,255)
-C_MEASURE = (0,159,255)
+C_ERROR: tuple[int, int, int] = (255, 0, 0)
+C_OK: tuple[int, int, int] = (0, 127, 0)
+C_ALERT: tuple[int, int, int] = (0, 159, 255)
+C_MEASURE: tuple[int, int, int] = (0, 159, 255)
 
 C_HTML_ERROR = 'color:red'
 C_HTML_OK = 'color:#007f00'
 C_HTML_ALERT = 'color:#009fff'
 
+
 class Status(Component):
-    def __init__(self):
-        Component.__init__(self, 'status')
-        self.new_measurement = False
-        self.measurement_error = False
+    def __init__(self) -> None:
+        super().__init__('status')
+        self.new_measurement: bool = False
+        self.measurement_error: bool = False
         self.ip_address = None
-        self.lasthtmlstatus = None
+        self.last_html_status = None
 
-    def __enter__(self):
+    def __enter__(self) -> object:
         with self.lock:
-            self.messageboard.subscribe('Measurement', self, Status.onMeasurement)
-            self.messageboard.subscribe('StatusProcessed', self, Status.onStatusProcessed)
-            self.messageboard.subscribe('Mode', self, Status.onMode)
-        return Component.__enter__(self)
+            self.message_board.subscribe('Measurement', self, Status.on_measurement)
+            self.message_board.subscribe('StatusProcessed', self, Status.on_status_processed)
+            self.message_board.subscribe('Mode', self, Status.on_mode)
+        return super().__enter__()
 
-    def onMeasurement(self, message):
+    def on_measurement(self, message: tuple[float, SensorData, SensorData]):
         with self.lock:
             self.new_measurement = True
-            uptime, S1Data, S2Data = message
-            self.measurement_error = S1Data.Error or S2Data.Error
+            _, s1_data, s2_data = message
+            self.measurement_error = s1_data.error or s2_data.error
 
-            self.__generateDisplayStatus()
-            self.__generateHTMLStatus()
+            self.__generate_display_status()
+            self.__generate_html_status()
 
-    def onStatusProcessed(self, message):
+    def on_status_processed(self, _: Any) -> None:  # TODO: Input required? For callback usage?
         with self.lock:
             if self.new_measurement:
                 self.new_measurement = False
-                self.__generateDisplayStatus()
+                self.__generate_display_status()
 
-    def onMode(self, message):
+    def on_mode(self, _: Any) -> None:  # TODO: Input required? For callback usage?
         with self.lock:
-            self.__generateDisplayStatus()
+            self.__generate_display_status()
 
-    def __generateHTMLStatus(self):
-        last_sync = self.messageboard.query('DCF77TimeSync')
+    def __generate_html_status(self) -> None:
+        last_sync = self.message_board.query('DCF77TimeSync')
         if self.measurement_error:
             status = ('Sensor error.', C_HTML_ERROR, last_sync)
         elif last_sync is None:
             status = ('Wait for radio clock signal.', C_HTML_ALERT, last_sync)
         else:
-            fanComment = self.messageboard.query('FanComment')
-            if fanComment is None:
-                fanComment = 'N/A'
-            error = 'error' in fanComment or 'Error' in fanComment
+            fan_comment = self.message_board.query('FanComment')
+            if fan_comment is None:
+                fan_comment = 'N/A'
+            error = 'error' in fan_comment or 'Error' in fan_comment
             color = C_HTML_ERROR if error else C_HTML_OK
-            statustxt = 'Error' if error else 'OK'
-            status = ('Status: ' + statustxt + '. ' + fanComment, color, last_sync)
-        if status != self.lasthtmlstatus:
-            self.lasthtmlstatus = status
-            self.messageboard.post('HTMLStatus', status)
+            status_txt = 'Error' if error else 'OK'
+            status = (f'Status: {status_txt}. {fan_comment}', color, last_sync)
+        if status != self.last_html_status:
+            self.last_html_status = status
+            self.message_board.post('HTMLStatus', status)
 
-    def __generateDisplayStatus(self):
+    def __generate_display_status(self) -> None:
         if self.new_measurement:
             status = ('Messung.', C_MEASURE)
         elif self.measurement_error:
             status = ('Sensorfehler.', C_ERROR)
-        elif self.messageboard.query('DCF77TimeSync') is None:
+        elif self.message_board.query('DCF77TimeSync') is None:
             status = ('Warte auf Funksignal.', C_ALERT)
         else:
-            mode = self.messageboard.query('Mode')
+            mode = self.message_board.query('Mode')
             if mode == 'manual':
                 status = ('Status: OK (manuell).', C_OK)
             else:
                 status = ('Status: OK (Automatik).', C_OK)
-        self.messageboard.post('Status', status)
+        self.message_board.post('Status', status)
