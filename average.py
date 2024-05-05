@@ -17,35 +17,37 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
 from collections import deque
 import logging
 
+from numpy import NaN
+
 from component import Component
-from sht75 import Bunch
-from uptime import Uptime
+from sht75 import SensorData
+from uptime import uptime as global_uptime
 
 logger = logging.getLogger('fancontrol')
 
-NaN = float('NaN')
 
 class Average(Component):
-    def __init__(self):
-        Component.__init__(self, 'average')
-        self.deque = deque(maxlen = 9000) # enough for 24h
+    def __init__(self) -> None:
+        super().__init__('average')
+        self.deque = deque(maxlen=9000)  # enough for 24h
 
-    def __enter__(self):
+    def __enter__(self) -> object:
         with self.lock:
-            self.messageboard.subscribe('Measurement', self, Average.onMeasurement)
-            self.messageboard.subscribe('Average', self, Average.onAverage)
-        return Component.__enter__(self)
+            self.message_board.subscribe('Measurement', self, Average.on_measurement)
+            self.message_board.subscribe('Average', self, Average.on_average)
+        return super().__enter__()
 
-    def onMeasurement(self, message):
+    def on_measurement(self, message: int) -> None:
         with self.lock:
             self.deque.appendleft(message)
 
-    def onAverage(self, message):
+    def on_average(self, message: int) -> tuple[SensorData, SensorData]:
         with self.lock:
-            uptime0 = Uptime()
+            uptime0 = global_uptime()
             timespan = message
 
             T1 = 0
@@ -57,29 +59,29 @@ class Average(Component):
             tau2 = 0
             count2 = 0
 
-            for uptime, S1Data, S2Data in self.deque:
+            for uptime, s1_data, s2_data in self.deque:
                 assert uptime <= uptime0
                 if uptime0 - uptime > timespan:
                     break
-                if not S1Data.Error:
-                    T1 += S1Data.T
-                    rH1 += S1Data.rH
-                    tau1 += S1Data.tau
+                if not s1_data.error:
+                    T1 += s1_data.temperature
+                    rH1 += s1_data.humidity
+                    tau1 += s1_data.tau
                     count1 += 1
-                if not S2Data.Error:
-                    T2 += S2Data.T
-                    rH2 += S2Data.rH
-                    tau2 += S2Data.tau
+                if not s2_data.error:
+                    T2 += s2_data.temperature
+                    rH2 += s2_data.humidity
+                    tau2 += s2_data.tau
                     count2 += 1
             if count1 > 0:
                 T1 /= count1
                 rH1 /= count1
                 tau1 /= count1
-            Error1 = count1 < max(1, timespan / 20)
+            error1 = count1 < max(1, timespan / 20)
             if count2 > 0:
                 T2 /= count2
                 rH2 /= count2
                 tau2 /= count2
-            Error2 = count2 < max(1, timespan / 20)
-            return (Bunch(rH = rH1, T = T1, tau = tau1, Error = Error1),
-                    Bunch(rH = rH2, T = T2, tau = tau2, Error = Error2))
+            error2 = count2 < max(1, timespan / 20)
+            return (SensorData(humidity=rH1, temperature=T1, tau=tau1, error=error1),
+                    SensorData(humidity=rH2, temperature=T2, tau=tau2, error=error2))

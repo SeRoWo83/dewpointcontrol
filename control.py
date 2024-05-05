@@ -18,15 +18,11 @@
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
-import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-else:
-    from configparser import RawConfigParser
-import logging
-import logging.handlers
 import os
 import time
+import logging
+import logging.handlers
+from configparser import RawConfigParser
 
 from average import Average
 from component import allThreadsAlive

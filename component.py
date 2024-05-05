@@ -17,83 +17,92 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
 from threading import Lock, Thread
 import logging
 
-from messageboard import messageboard
+from messageboard import message_board as my_message_board, MessageBoard
 from shutdown import shutdown
 
 logger = logging.getLogger('fancontrol')
 
-class ThreadManager:
-    def __init__(self, messageboard):
-        self.workerThreads = []
-        self.messageboard = messageboard
-        self.messageboard.subscribe('Shutdown', self, ThreadManager.onShutdown)
-
-    def addThread(self, thread):
-        self.workerThreads.append(thread)
-
-    def allThreadsAlive(self):
-        for thread in self.workerThreads:
-            if not thread.is_alive():
-                logger.error('The {} thread died.'.format(thread.name))
-                return False
-        return True
-
-    def onShutdown(self, message):
-        logger.info('Shutdown by user request')
-        messageboard.post('ExitThread', True)
-        for thread in self.workerThreads:
-            thread.stop()
-        print('System shutdown')
-        shutdown()
-
-threadManager = ThreadManager(messageboard)
-
-allThreadsAlive = threadManager.allThreadsAlive
 
 class Component:
-    messageboard = messageboard
+    message_board = my_message_board
 
-    def __init__(self, name):
+    def __init__(self, name: str) -> None:
         self.name = name
         self.lock = Lock()
 
-    def __enter__(self):
+    def __enter__(self) -> object:
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.messageboard.unsubscribeAll(self)
-        self.messageboard.post('ExitThread', True)
-        print('Exit {} worker.'.format(self.name))
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        self.message_board.unsubscribe_all(self)
+        self.message_board.post('ExitThread', True)
+        print(f'Exit {self.name} worker.')
+
 
 class ComponentWithThread(Component):
-    def __init__(self, name):
-        Component.__init__(self, name)
-        self.thread = Thread(None, self.__run, self.name)
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.thread = Thread(target=self.__run, name=self.name)
 
-    def __enter__(self):
+    def __enter__(self) -> object:
         self.thread.start()
-        threadManager.addThread(self)
-        return Component.__enter__(self)
+        threadManager.add_thread(self)
+        return super().__enter__()
 
-    def __exit__(self, exc_type, exc_value, traceback):
-        Component.__exit__(self, exc_type, exc_value, traceback)
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        super().__exit__(exc_type, exc_value, traceback)
         self.stop()
 
-    def __run(self):
+    def __run(self) -> None:
         try:
             self.run()
         except:
             raise
         finally:
-            print('Leave {} thread.'.format(self.name))
+            print(f'Leave {self.name} thread.')
 
-    def stop(self):
-        print('Join {} thread.'.format(self.name))
+    def run(self) -> None:
+        # This method should be overridden by child classes similar to built in threads
+        pass
+
+    def stop(self) -> None:
+        print(f'Join {self.name} thread.')
         self.thread.join()
-        print('The {} thread has joined.'.format(self.name))
+        print(f'The {self.name} thread has joined.')
 
-    def is_alive(self):
+    def is_alive(self) -> bool:
         return self.thread.is_alive()
+
+
+class ThreadManager:
+    def __init__(self, message_board: MessageBoard) -> None:
+        self.worker_threads: list[ComponentWithThread] = []
+        self.message_board = message_board
+        self.message_board.subscribe('Shutdown', self, ThreadManager.on_shutdown)
+
+    def add_thread(self, thread: ComponentWithThread) -> None:
+        self.worker_threads.append(thread)
+
+    def all_threads_alive(self) -> bool:
+        for thread in self.worker_threads:
+            if not thread.is_alive():
+                logger.error(f'The {thread.name} thread died.')
+                return False
+        return True
+
+    def on_shutdown(self, _) -> None:
+        logger.info('Shutdown by user request')
+        my_message_board.post('ExitThread', True)
+        for thread in self.worker_threads:
+            thread.stop()
+        print('System shutdown')
+        shutdown()
+
+
+threadManager = ThreadManager(my_message_board)
+
+allThreadsAlive = threadManager.all_threads_alive

@@ -17,19 +17,14 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
 import atexit
-import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-    from Queue import Queue, Empty
-else:
-    from configparser import RawConfigParser
-    from queue import Queue, Empty
-import time
+from configparser import RawConfigParser
+from queue import Queue, Empty
 
 import RPi.GPIO as GPIO
 
-from uptime import Uptime
+from misc import delay
 from component import ComponentWithThread
 
 DEBUG = False
@@ -43,110 +38,105 @@ relays = [
     config.getint('pins', 'relay3'),
     config.getint('pins', 'relay4')]
 
-def cleanup():
+
+def cleanup() -> None:
     print('Start GPIO cleanup for devices.')
     GPIO.output(relays, GPIO.HIGH)
     GPIO.cleanup(relays)
     print('GPIO cleaned up for devices.')
 
+
 atexit.register(cleanup)
 
 GPIO.setmode(GPIO.BOARD)
 for relay in relays:
-    print('Set up relay on port {}.'.format(relay))
+    print(f'Set up relay on port {relay}.')
     GPIO.setup(relay, GPIO.OUT, initial=GPIO.HIGH)
 
-def delay(seconds):
-    time0 = Uptime()
-    sleeptime = seconds
-    while sleeptime > 0:
-        time.sleep(sleeptime)
-        time1 = Uptime()
-        sleeptime = seconds - time1 + time0
 
 class Devices(ComponentWithThread):
-    def __init__(self):
-        ComponentWithThread.__init__(self, 'devices')
+    def __init__(self) -> None:
+        super().__init__('devices')
         self.isFanOn = False
         self.isWindowMotorOn = False
         self.queue = Queue()
         if CLOSE_WINDOW:
-            self.onDevices('VentilationOff')
+            self.on_devices('VentilationOff')
 
-    def __enter__(self):
+    def __enter__(self) -> object:
         with self.lock:
-            self.messageboard.subscribe('Devices', self, Devices.onDevices)
-        return ComponentWithThread.__enter__(self)
+            self.message_board.subscribe('Devices', self, Devices.on_devices)
+        return super().__enter__()
 
-    def stop(self):
-        ComponentWithThread.stop(self)
+    def stop(self) -> None:
+        super().stop()
         if CLOSE_WINDOW:
-            self.__fanOff()
-            self.__closeWindow()
+            self.__fan_off()
+            self.__close_window()
 
-    def onDevices(self, message):
+    def on_devices(self, message: str) -> None:
         with self.lock:
             self.queue.put(message)
 
-    def run(self):
-        while self.messageboard.query('ExitThread') is None:
+    def run(self) -> None:
+        while self.message_board.query('ExitThread') is None:
             try:
                 if DEBUG:
-                    print('Devices: queue length is {}'.format(self.queue.qsize()))
+                    print(f'Devices: queue length is {self.queue.qsize()}')
                 message = self.queue.get(True, 1)
                 self.queue.task_done()
                 if DEBUG:
-                    print('Devices message: {}'.format(message))
-                if message=='StartOpenWindow':
-                    self.__startOpenWindow()
-                elif message=='StartCloseWindow':
-                    self.__startCloseWindow()
-                elif message=='StopWindowMotor':
-                    self.__stopWindowMotor()
-                elif message=='OpenWindow':
-                    self.__openWindow()
-                elif message=='CloseWindow':
-                    self.__closeWindow()
-                elif message=='FanOn':
-                    self.__fanOn()
-                elif message=='FanOff':
-                    self.__fanOff()
-                elif message=='VentilationOn':
-                    self.__openWindow()
-                    self.__fanOn()
-                elif message=='VentilationOff':
-                    self.__fanOff()
-                    self.__closeWindow()
-                else:
-                    raise ValueError(message)
+                    print(f'Devices message: {message}')
+
+                match message:
+                    case 'StartOpenWindow':
+                        self.__start_open_window()
+                    case 'StartCloseWindow':
+                        self.__start_close_window()
+                    case 'StopWindowMotor':
+                        self.__stop_window_motor()
+                    case 'OpenWindow':
+                        self.__open_window()
+                    case 'CloseWindow':
+                        self.__close_window()
+                    case 'FanOn':
+                        self.__fan_on()
+                    case 'FanOff':
+                        self.__fan_off()
+                    case 'VentilationOn':
+                        self.__open_window(), self.__fan_on()
+                    case 'VentilationOff':
+                        self.__fan_off(), self.__close_window()
+                    case _:
+                        raise ValueError(message)
             except Empty:
                 pass
 
-    def __startOpenWindow(self):
+    def __start_open_window(self) -> None:
         if self.isWindowMotorOn:
-            self.__stopWindowMotor()
-        self.messageboard.post('FanState', 'OpenWindow')
+            self.__stop_window_motor()
+        self.message_board.post('FanState', 'OpenWindow')
         self.isWindowMotorOn = True
         GPIO.output(relays[1], GPIO.LOW)
         delay(.5)
         GPIO.output([relays[0], relays[3]], GPIO.LOW)
         delay(.5)
 
-    def __startCloseWindow(self):
+    def __start_close_window(self) -> None:
         if self.isWindowMotorOn:
-            self.__stopWindowMotor()
-        self.messageboard.post('FanState', 'CloseWindow')
+            self.__stop_window_motor()
+        self.message_board.post('FanState', 'CloseWindow')
         self.isWindowMotorOn = True
         GPIO.output(relays[1], GPIO.HIGH)
         delay(.5)
         GPIO.output([relays[0], relays[3]], GPIO.LOW)
         delay(.5)
 
-    def __stopWindowMotor(self):
+    def __stop_window_motor(self) -> None:
         if self.isFanOn:
-            self.messageboard.post('FanState', 'FanOn')
+            self.message_board.post('FanState', 'FanOn')
         else:
-            self.messageboard.post('FanState', 'FanOff')
+            self.message_board.post('FanState', 'FanOff')
         GPIO.output(relays[0], GPIO.HIGH)
         delay(.5)
         GPIO.output(relays[1], GPIO.HIGH)
@@ -155,26 +145,26 @@ class Devices(ComponentWithThread):
             GPIO.output(relays[3], GPIO.HIGH)
         delay(.5)
 
-    def __openWindow(self):
-        self.__startOpenWindow()
+    def __open_window(self) -> None:
+        self.__start_open_window()
         delay(10)
-        self.__stopWindowMotor()
+        self.__stop_window_motor()
 
-    def __closeWindow(self):
-        self.__startCloseWindow()
+    def __close_window(self) -> None:
+        self.__start_close_window()
         delay(10)
-        self.__stopWindowMotor()
+        self.__stop_window_motor()
 
-    def __fanOn(self):
-        self.messageboard.post('FanState', 'FanOn')
+    def __fan_on(self) -> None:
+        self.message_board.post('FanState', 'FanOn')
         GPIO.output(relays[2:4], GPIO.LOW)
         self.isFanOn = True
         delay(.5)
 
-    def __fanOff(self):
+    def __fan_off(self) -> None:
         GPIO.output(relays[2], GPIO.HIGH)
         self.isFanOn = False
         if not self.isWindowMotorOn:
             GPIO.output(relays[3], GPIO.HIGH)
-            self.messageboard.post('FanState', 'FanOff')
+            self.message_board.post('FanState', 'FanOff')
         delay(.5)

@@ -17,12 +17,9 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
 import atexit
-import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-else:
-    from configparser import RawConfigParser
+from configparser import RawConfigParser
 from datetime import datetime, timedelta, tzinfo
 from timeit import default_timer as timer
 import RPi.GPIO as GPIO
@@ -35,10 +32,12 @@ config = RawConfigParser()
 config.read('fancontrol.cfg')
 dataPin = config.getint('pins', 'dcf77')
 
-def cleanup():
+
+def cleanup() -> None:
     print('Start GPIO cleanup for DCF77 reader.')
     GPIO.cleanup(dataPin)
     print('GPIO cleaned up for DCF77 reader.')
+
 
 atexit.register(cleanup)
 
@@ -46,10 +45,12 @@ GPIO.setmode(GPIO.BOARD)
 GPIO.setup(dataPin, GPIO.IN, GPIO.PUD_UP)
 
 # Todo: replace by datetime.timezone for Python3
-STDOFFSET = timedelta(hours = 1)
-DSTOFFSET = timedelta(hours = 2)
+STDOFFSET = timedelta(hours=1)
+DSTOFFSET = timedelta(hours=2)
 ZERO = timedelta(0)
-HOUR = timedelta(hours = 1)
+HOUR = timedelta(hours=1)
+
+
 class DCF77Timezone(tzinfo):
     def __init__(self, isdst):
         self._isdst = isdst
@@ -72,16 +73,19 @@ class DCF77Timezone(tzinfo):
         # 'dt' argument is ignored!
         return 'CEST' if self._isdst else 'CET'
 
+
 # Convert BCD to decimal
 def bcdToDec(b0, b1, b2=0, b3=0):
     result = b0 + b1 * 2 + b2 * 4 + b3 * 8
     assert result < 10, ('BCD', result)
     return result
 
+
 # Parity check (even parity)
 # The parity bit must be contained in the array.
 def check_parity(bit_arr):
     assert sum(bit_arr) & 1 == 0, ('Parity', bit_arr)
+
 
 def decodeDCF77(bit_seq):
     try:
@@ -93,7 +97,7 @@ def decodeDCF77(bit_seq):
 
         # Daylight saving time?
         isdst = bit_seq[17]
-        tzinfo = DCF77Timezone(isdst)
+        my_tzinfo = DCF77Timezone(isdst)
 
         # Minute (BCD)
         minute1 = bcdToDec(*bit_seq[21:25])
@@ -126,20 +130,22 @@ def decodeDCF77(bit_seq):
         # Convert to 'datetime' format
         second = 0
         microsecond = 0
-        dcf77_time = datetime(year, month, day, hour, minute, second, microsecond, tzinfo)
+        dcf77_time = datetime(year, month, day, hour, minute, second, microsecond, my_tzinfo)
         return dcf77_time
     except AssertionError as e:
         if DEBUG:
             print(e)
         return None
 
-def dummyBreakEvent():
+
+def dummy_break_event() -> bool:
     return False
 
+
 class Receiver:
-    def __init__(self, callback=None, breakEvent=dummyBreakEvent):
+    def __init__(self, callback=None, break_event=dummy_break_event):
         self.callback = callback
-        self.breakEvent = breakEvent
+        self.break_event = break_event
         self.lock = threading.Lock()
 
     def run(self):
@@ -150,7 +156,7 @@ class Receiver:
         self.state = None
         self.t0 = self.t1 = timer()
         GPIO.add_event_detect(dataPin, GPIO.BOTH, bouncetime=50, callback=self.onData)
-        while not self.breakEvent() and not self.exception:
+        while not self.break_event() and not self.exception:
             time.sleep(1)
         GPIO.remove_event_detect(dataPin)
         if self.exception:
@@ -169,7 +175,7 @@ class Receiver:
                     time_up = self.t0 - self.t1
                     if DEBUG:
                         print(time_up)
-                    if time_up > 1.7 and time_up < 2.0:
+                    if 1.7 < time_up < 2.0:
                         if self.dcf77_time and self.callback:
                             self.callback(self.dcf77_time)
                             self.dcf77_time = None
@@ -178,9 +184,9 @@ class Receiver:
                         self.sec = 0
                     elif (time_up > 1.0 or time_up < .7) and self.sec < 61:
                         if DEBUG:
-                            print('Unusual pause length: {}s.'.format(time_up))
+                            print(f'Unusual pause length: {time_up}s.')
                     if DEBUG:
-                        print('Seconds: {}'.format(self.sec))
+                        print(f'Seconds: {self.sec}')
                 else:
                     self.t1 = timer()
                     if self.state == 1:
@@ -189,32 +195,36 @@ class Receiver:
                         self.sec = 60
                     self.state = 1
                     time_down = self.t1 - self.t0
-                    zero_bit = time_down > 0.08 and time_down < 0.13
-                    one_bit = time_down > 0.17 and time_down < 0.24
+                    zero_bit = 0.08 < time_down < 0.13
+                    one_bit = 0.17 < time_down < 0.24
                     self.dcf77_time = None
                     if zero_bit == one_bit:
                         if DEBUG:
-                            print('Unusual pulse length: {}s.'.format(time_down))
+                            print(f'Unusual pulse length: {time_down}s.')
                         self.sec = 60
                     elif self.sec < 59:
                         self.bit_seq[self.sec] = one_bit
                         self.sec += 1
-                        if self.sec==59:
+                        if self.sec == 59:
                             self.dcf77_time = decodeDCF77(self.bit_seq)
                             if not self.dcf77_time:
                                 print('DCF77: Decode error.')
             except Exception as e:
                 self.exception = e
 
+
 # Main function to receive the DCF77 signal
-def receiveTime(callback=None):
+def receive_time(callback=None):
     R = Receiver(callback)
     R.run()
 
-if __name__=='__main__':
-    def compareToSystemTime(dcf77_time):
+
+if __name__ == '__main__':
+    def compare_to_system_time(dcf77_time):
         now = datetime.now()
-        print('System time: {}'.format(now))
-        print('DCF77 time:  {}'.format(dcf77_time))
-        print('Difference: {}'.format(abs(dcf77_time - now)))
-    dcf77_time = receiveTime(compareToSystemTime)
+        print(f'System time: {now}')
+        print(f'DCF77 time:  {dcf77_time}')
+        print(f'Difference: {abs(dcf77_time - now)}')
+
+
+    dcf77_time = receive_time(compare_to_system_time)

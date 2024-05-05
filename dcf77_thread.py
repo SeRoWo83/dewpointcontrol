@@ -17,35 +17,38 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
 import logging
 import os
 import time
+from datetime import datetime
 
 from component import ComponentWithThread
 from dcf77_reader import Receiver
 
 logger = logging.getLogger('fancontrol')
 
-class DCF77(ComponentWithThread):
-    def __init__(self):
-        ComponentWithThread.__init__(self, 'DCF77 receiver')
 
-    def __callback(self, dcf77_time):
+class DCF77(ComponentWithThread):
+    def __init__(self) -> None:
+        super().__init__('DCF77 receiver')
+
+    def __callback(self, dcf77_time: datetime) -> None:
         # Format date/time string
         utctime = dcf77_time.utctimetuple()
         time_date_str = time.strftime("\"%Y-%m-%d %H:%M:00\"", utctime)
         # Set system time
-        retval = os.system("date -u -s " + time_date_str + " > /dev/null")
+        retval = os.system(f"date -u -s {time_date_str} > /dev/null")
         if retval != 0:
-            logger.error('"date" command return value is {}.'.format(retval))
-        time_date_str = "{:02d}.{:02d}.{:4d}, {:02d}:{:02d} {}".format(
-            dcf77_time.day, dcf77_time.month, dcf77_time.year, dcf77_time.hour,
-            dcf77_time.minute, dcf77_time.tzinfo.tzname(dcf77_time))
-        self.messageboard.post('DCF77TimeSync', time_date_str)
-        logger.info('dcf77,{}'.format(time_date_str))
+            logger.error(f'"date" command return value is {retval}.')
+        time_date_str = (f"{dcf77_time.day:02d}.{dcf77_time.month:02d}.{dcf77_time.year:4d}, "
+                         f"{dcf77_time.hour:02d}:{dcf77_time.minute:02d} {dcf77_time.tzinfo.tzname(dcf77_time)}")
+        self.message_board.post('DCF77TimeSync', time_date_str)
+        logger.info(f'dcf77,{time_date_str}')
 
-    def run(self):
-        def breakEvent():
-            return self.messageboard.query('ExitThread') is not None
-        R = Receiver(callback=self.__callback, breakEvent=breakEvent)
-        R.run()
+    def run(self) -> None:
+        def break_event() -> bool:
+            return self.message_board.query('ExitThread') is not None
+
+        r = Receiver(callback=self.__callback, break_event=break_event)
+        r.run()
