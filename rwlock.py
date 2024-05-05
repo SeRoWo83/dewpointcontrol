@@ -15,42 +15,48 @@
     GNU General Public License for more details.
 
     You should have received a copy of the GNU General Public License
-    along with this program. If not, see <http://www.gnu.org/licenses/>.
+    along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     Modified version of code by Mateusz Kobos.
     Original source: https://code.activestate.com/recipes/577803
 """
-import threading
+
+from threading import Lock
+
 
 class _LockInterface:
     # Support for the 'with' statement
     class __ReadAccess:
-        def __init__(self, rwlock):
-            self.rwlock = rwlock
-        def __enter__(self):
+        def __init__(self, rwlock) -> None:
+            self.rwlock: _LockInterface = rwlock
+
+        def __enter__(self) -> object:
             self.rwlock.acquire_read()
             return self.rwlock
-        def __exit__(self, exc_type, exc_value, traceback):
+
+        def __exit__(self, exc_type, exc_value, traceback) -> None:
             self.rwlock.release_read()
 
     class __WriteAccess:
-        def __init__(self, rwlock):
-            self.rwlock = rwlock
-        def __enter__(self):
+        def __init__(self, rwlock) -> None:
+            self.rwlock: _LockInterface = rwlock
+
+        def __enter__(self) -> object:
             self.rwlock.acquire_write()
             return self.rwlock
-        def __exit__(self, exc_type, exc_value, traceback):
+
+        def __exit__(self, exc_type, exc_value, traceback) -> None:
             self.rwlock.release_write()
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.read_access = _LockInterface.__ReadAccess(self)
         self.write_access = _LockInterface.__WriteAccess(self)
 
 class RWLock(_LockInterface):
     """Synchronization object used in a solution of so-called second
     readers-writers problem. In this problem, many readers can simultaneously
-    access a share, and a writer has an exclusive access to this share.
+    access a share, and a writer has exclusive access to this share.
     Additionally, the following constraints should be met:
     1) no reader should be kept waiting if the share is currently opened for
         reading unless a writer is also waiting for the share,
@@ -66,66 +72,69 @@ class RWLock(_LockInterface):
     [2] P.J. Courtois, F. Heymans, D.L. Parnas:
         "Concurrent Control with 'Readers' and 'Writers'",
         Communications of the ACM, 1971 (via [3])
-    [3] http://en.wikipedia.org/wiki/Readers-writers_problem
+    [3] https://en.wikipedia.org/wiki/Readers-writers_problem
     """
 
-    def __init__(self):
-        _LockInterface.__init__(self)
+    def __init__(self) -> None:
+        super().__init__()
         self.__read_switch = _LightSwitch()
         self.__write_switch = _LightSwitch()
-        self.__no_readers = threading.Lock()
-        self.__no_writers = threading.Lock()
-        self.__readers_queue = threading.Lock()
+        self.__no_readers = Lock()
+        self.__no_writers = Lock()
+        self.__readers_queue = Lock()
         """A lock giving an even higher priority to the writer in certain
         cases (see [2] for a discussion)"""
 
-    def acquire_read(self):
+    def acquire_read(self) -> None:
         with self.__readers_queue, self.__no_readers:
             self.__read_switch.acquire(self.__no_writers)
 
-    def release_read(self):
+    def release_read(self) -> None:
         self.__read_switch.release(self.__no_writers)
 
-    def acquire_write(self):
+    def acquire_write(self) -> None:
         self.__write_switch.acquire(self.__no_readers)
         self.__no_writers.acquire()
 
-    def release_write(self):
+    def release_write(self) -> None:
         self.__no_writers.release()
         self.__write_switch.release(self.__no_readers)
 
-class RWLockReaderPriority(_LockInterface):
-    def __init__(self):
-        _LockInterface.__init__(self)
-        self.__read_switch = _LightSwitch()
-        self.__no_writers = threading.Lock()
 
-    def acquire_read(self):
+class RWLockReaderPriority(_LockInterface):
+    def __init__(self) -> None:
+        super().__init__()
+        self.__read_switch = _LightSwitch()
+        self.__no_writers = Lock()
+
+    def acquire_read(self) -> None:
         self.__read_switch.acquire(self.__no_writers)
 
-    def release_read(self):
+    def release_read(self) -> None:
         self.__read_switch.release(self.__no_writers)
 
-    def acquire_write(self):
+    def acquire_write(self) -> None:
         self.__no_writers.acquire()
 
-    def release_write(self):
+    def release_write(self) -> None:
         self.__no_writers.release()
+
 
 class _LightSwitch:
     """An auxiliary "light switch"-like object. The first thread turns on the
     "switch", the last one turns it off (see [1, sec. 4.2.2] for details)."""
-    def __init__(self):
-        self.__counter = 0
-        self.__mutex = threading.Lock()
 
-    def acquire(self, lock):
+    def __init__(self) -> None:
+        self.__counter = 0
+        self.__mutex = Lock()
+
+    def acquire(self, lock: Lock) -> None:
         with self.__mutex:
             self.__counter += 1
             if self.__counter == 1:
                 lock.acquire()
 
-    def release(self, lock):
+    def release(self, lock: Lock) -> None:
         with self.__mutex:
             self.__counter -= 1
             if self.__counter == 0:

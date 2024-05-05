@@ -17,13 +17,8 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-    import Queue
-else:
-    from configparser import RawConfigParser
-    import queue
+
+from configparser import RawConfigParser
 import codecs
 import datetime
 import os
@@ -31,10 +26,11 @@ import shutil
 import time
 
 from ip import get_ip_address, get_wan_ip
-from uptime import Uptime
+from uptime import uptime
 from component import Component
 
-progstart = Uptime()
+
+prog_start = uptime()
 
 DEBUG = False
 

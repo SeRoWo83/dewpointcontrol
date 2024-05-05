@@ -17,12 +17,14 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
 import dbus
 
-def shutdown():
-    # http://stackoverflow.com/a/41644926
+
+def shutdown() -> None:
+    # https://stackoverflow.com/a/41644926
     sys_bus = dbus.SystemBus()
-    lg = sys_bus.get_object('org.freedesktop.login1','/org/freedesktop/login1')
-    pwr_mgmt =  dbus.Interface(lg,'org.freedesktop.login1.Manager')
+    lg = sys_bus.get_object('org.freedesktop.login1', '/org/freedesktop/login1')
+    pwr_mgmt = dbus.Interface(lg, 'org.freedesktop.login1.Manager')
     shutdown_method = pwr_mgmt.get_dbus_method("PowerOff")
     shutdown_method(True)

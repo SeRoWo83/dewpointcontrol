@@ -17,21 +17,17 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-else:
-    from configparser import RawConfigParser
+
+from configparser import RawConfigParser
 import datetime
 import logging
 import psutil
 import RPi.GPIO as GPIO
-from threading import Lock
 import time
 
 from component import Component
 from ip import get_ip_address
-from uptime import Uptime
+from uptime import uptime
 
 logger = logging.getLogger('fancontrol')
 
@@ -44,12 +40,13 @@ button_back = config.getint('pins', 'button_back')
 
 GPIO.setmode(GPIO.BOARD)
 
-class Buttoncontroller:
+
+class ButtonController:
     def __init__(self, messageboard):
         self.messageboard = messageboard
         self.buttons = []
 
-    def __enter__(self):
+    def __enter__(self) -> object:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
@@ -60,35 +57,38 @@ class Buttoncontroller:
 
     def addbuttoncallback(self, button, callback):
         self.buttons.append(button)
-        print('Set up button {}.'.format(button))
+        print(f'Set up button {button}.')
         GPIO.setup(button, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
         def wrapped_callback(*args, **kwargs):
             try:
                 callback(*args, **kwargs)
             except Exception as e:
                 self.messageboard.post('Exception', e)
+
         GPIO.add_event_detect(button, GPIO.BOTH, callback=wrapped_callback, bouncetime=100)
+
 
 class Menu(Component):
     def __init__(self):
-        Component.__init__(self, 'menu')
-        self.menus = [MainScreen(self.messageboard)]
+        super().__init__('menu')
+        self.menus: list[MainScreen] = [MainScreen(self.message_board)]
         self.menus[-1].display()
 
     def __enter__(self):
         with self.lock:
-            self.buttoncontroller = Buttoncontroller(self.messageboard)
-            self.buttoncontroller.__enter__()
-            self.buttoncontroller.addbuttoncallback(button_left, self.cancel)
-            self.buttoncontroller.addbuttoncallback(button_back, self.back)
-            self.buttoncontroller.addbuttoncallback(button_front, self.forward)
-            self.buttoncontroller.addbuttoncallback(button_right, self.select)
-        return Component.__enter__(self)
+            self.button_controller = ButtonController(self.message_board)
+            self.button_controller.__enter__()
+            self.button_controller.addbuttoncallback(button_left, self.cancel)
+            self.button_controller.addbuttoncallback(button_back, self.back)
+            self.button_controller.addbuttoncallback(button_front, self.forward)
+            self.button_controller.addbuttoncallback(button_right, self.select)
+        return super().__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
         with self.lock:
-            self.buttoncontroller.__exit__(exc_type, exc_value, traceback)
-        Component.__exit__(self, exc_type, exc_value, traceback)
+            self.button_controller.__exit__(exc_type, exc_value, traceback)
+        super().__exit__(exc_type, exc_value, traceback)
 
     def cancel(self, pin):
         with self.lock:
@@ -103,20 +103,20 @@ class Menu(Component):
         with self.lock:
             pressed = not GPIO.input(pin)
             if pressed:
-                newmenu = self.menus[-1].back()
-                if newmenu:
-                    self.menus.append(newmenu)
-                    newmenu.display()
+                new_menu = self.menus[-1].back()
+                if new_menu:
+                    self.menus.append(new_menu)
+                    new_menu.display()
             self.wait_until_released(pin)
 
     def forward(self, pin):
         with self.lock:
             pressed = not GPIO.input(pin)
             if pressed:
-                newmenu = self.menus[-1].forward()
-                if newmenu:
-                    self.menus.append(newmenu)
-                    newmenu.display()
+                new_menu = self.menus[-1].forward()
+                if new_menu:
+                    self.menus.append(new_menu)
+                    new_menu.display()
             self.wait_until_released(pin)
 
     def select(self, pin):
@@ -133,6 +133,7 @@ class Menu(Component):
     def wait_until_released(pin):
         while not GPIO.input(pin):
             time.sleep(.1)
+
 
 class MainScreen:
     def __init__(self, messageboard):
@@ -152,6 +153,7 @@ class MainScreen:
 
     def leave(self):
         pass
+
 
 class MainMenu:
     displayLines = 6
@@ -207,7 +209,7 @@ class MainMenu:
                 mode = 'manual'
             self.messageboard.post('Mode', mode)
             self.display()
-            logger.info('user,Mode:{}'.format(mode))
+            logger.info(f'user,Mode:{mode}')
         elif self.currentitem == 2:
             self.status = u'Schliesse Fenster…'
             self.messageboard.post('Mode', 'manual')
@@ -255,51 +257,55 @@ class MainMenu:
     def leave(self):
         pass
 
+
 prefix = [(float(1 << e), p) for e, p in ((30, 'G'), (20, 'M'), (10, 'K'))]
+
 
 def humanBytes(n):
     for m, p in prefix:
         if n >= m:
-            return '{:.1f}{}'.format(n / m, p)
-    return "{}B".format(n)
+            return f'{(n / m):.1f}{p}'
+    return f"{n}B"
+
 
 def getAvailableRAM():
     return humanBytes(psutil.virtual_memory().available)
 
-class InfoScreen:
-    progstart = Uptime()
-    displayLines = 7
 
-    def __init__(self, messageboard):
+class InfoScreen:
+    prog_start = uptime()
+    display_lines = 7
+
+    def __init__(self, messageboard) -> None:
         self.messageboard = messageboard
         self.index = 0
 
-    def display(self):
+    def display(self) -> None:
         infolines = (
             ['IP Ethernet/WLAN:'],
             ['', get_ip_address('eth0')],
             ['', get_ip_address('wlan0')],
             ['Bootvorgang vor:'],
-            ['', str(datetime.timedelta(seconds=int(Uptime())))],
+            ['', str(datetime.timedelta(seconds=int(uptime())))],
             ['Programmstart vor:'],
-            ['', str(datetime.timedelta(seconds=int(Uptime() - self.progstart)))],
+            ['', str(datetime.timedelta(seconds=int(uptime() - self.prog_start)))],
             ['Freies RAM:', getAvailableRAM()],
         )
-        self.index = max(min(self.index, len(infolines) - self.displayLines), 0)
+        self.index = max(min(self.index, len(infolines) - self.display_lines), 0)
         self.messageboard.post(
             'Info',
-            infolines[self.index:self.index + self.displayLines])
+            infolines[self.index:self.index + self.display_lines])
 
-    def forward(self):
+    def forward(self) -> None:
         self.index += 1
         self.display()
 
-    def back(self):
+    def back(self) -> None:
         self.index -= 1
         self.display()
 
     def select(self, pin):
         pass
 
-    def leave(self):
+    def leave(self) -> None:
         pass

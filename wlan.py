@@ -16,20 +16,20 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
-import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-else:
-    from configparser import RawConfigParser
+
+from time import struct_time
+from configparser import RawConfigParser
 from datetime import datetime
 import logging
-import dbus
 from threading import Event
-import time
+
+import dbus
 
 from component import Component, ComponentWithThread
-from uptime import Uptime
+from uptime import uptime
 from ip import get_ip_address
+
+from misc import CSV, delay
 
 DEBUG = False
 
@@ -41,65 +41,51 @@ config.read('fancontrol.cfg')
 measure_interval = config.getint('check_network', 'interval')
 assert measure_interval >= 1
 
+
 class RestartWLAN(Component):
-    def __init__(self):
-        Component.__init__(self, 'restartWLAN')
+    def __init__(self) -> None:
+        super().__init__('restartWLAN')
 
-    def __enter__(self):
+    def __enter__(self) -> object:
         with self.lock:
-            self.messageboard.subscribe('RestartWLAN', self, RestartWLAN.onResetWLAN)
-        return Component.__enter__(self)
+            self.message_board.subscribe('RestartWLAN', self, RestartWLAN.on_reset_wlan)
+        return super().__enter__()
 
-    def onResetWLAN(self, message):
-        assert message == True
+    def on_reset_wlan(self, message: bool) -> None:
+        assert message is True
         with self.lock:
             sys_bus = dbus.SystemBus()
             systemd1 = sys_bus.get_object('org.freedesktop.systemd1', '/org/freedesktop/systemd1')
             manager = dbus.Interface(systemd1, 'org.freedesktop.systemd1.Manager')
             job = manager.RestartUnit('netctl@ts3.service', 'fail')
 
-class csv:
-    def __init__(self, *args):
-        self.args = args
-
-    def __str__(self):
-        return ','.join(map(str, self.args))
-
-def delay(seconds):
-    time0 = Uptime()
-    sleeptime = seconds
-    while sleeptime > 0:
-        time.sleep(sleeptime)
-        time1 = Uptime()
-        sleeptime = seconds - time1 + time0
 
 class CheckNetwork(ComponentWithThread):
-    def __init__(self):
-        ComponentWithThread.__init__(self, 'check_wlan')
-        self.event = Event()
-        self.lastmeasurement = Uptime()
+    def __init__(self) -> None:
+        super().__init__('check_wlan')
+        self.event: Event = Event()
+        ut: float = uptime()
+        self.last_measurement: float = ut
+        self.uptime: float = ut
 
-    def __enter__(self):
-        self.messageboard.subscribe('Time', self, CheckNetwork.onTime)
-        return ComponentWithThread.__enter__(self)
+    def __enter__(self) -> object:
+        self.message_board.subscribe('Time', self, CheckNetwork.on_time)
+        return super().__enter__()
 
-    def onTime(self, message):
-        self.uptime, localtime = message
-        if self.uptime > self.lastmeasurement + 10.5:
-            logger.warning('Interval between network checks > 10.5s: {}, {}.'.
-                           format(self.lastmeasurement, self.uptime))
-        if int(self.uptime) % measure_interval == 0 \
-           or self.uptime > self.lastmeasurement + 10.5:
-            self.lastmeasurement = self.uptime
+    def on_time(self, message: tuple[float, struct_time]) -> None:
+        self.uptime, _ = message
+        if self.uptime > self.last_measurement + 10.5:
+            logger.warning(f'Interval between network checks > 10.5s: {self.last_measurement}, {self.uptime}.')
+        if int(self.uptime) % measure_interval == 0 or self.uptime > self.last_measurement + 10.5:
+            self.last_measurement = self.uptime
             self.event.set()
 
     @staticmethod
-    def checkNetwork():
-        return get_ip_address('wlan0') != 'None' or \
-            get_ip_address('eth0') != 'None'
+    def check_network() -> bool:
+        return get_ip_address('wlan0') != 'None' or get_ip_address('eth0') != 'None'
 
-    def run(self):
-        while self.messageboard.query('ExitThread') is None:
+    def run(self) -> None:
+        while self.message_board.query('ExitThread') is None:
             if self.event.wait(1):
                 self.event.clear()
                 # Start measurement approx. 250 ms after the full second.
@@ -109,6 +95,6 @@ class CheckNetwork(ComponentWithThread):
                 assert wait >= 0
                 assert wait < 1
                 delay(wait)
-                online = self.checkNetwork()
-                self.messageboard.post('Network', online)
-                #logger.info(csv('network', online))
+                online = self.check_network()
+                self.message_board.post('Network', online)
+                # logger.info(CSV('network', online))

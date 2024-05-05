@@ -26,7 +26,7 @@ from rwlock import RWLock, RWLockReaderPriority
 
 
 class MessageBoard:
-    def __init__(self):
+    def __init__(self) -> None:
         self.messages: dict[str, ...] = {}
         self.message_lock: RWLock = RWLock()
         self.subscriptions: dict[str, ...] = {}

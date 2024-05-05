@@ -7,14 +7,14 @@ from uptime import uptime
 
 
 class CSV:
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         self.args = args
 
-    def __str__(self):
+    def __str__(self) -> str:
         return ','.join(map(str, self.args))
 
 
-def delay(seconds):
+def delay(seconds: float) -> None:
     time0 = uptime()
     sleep_time = seconds
     while sleep_time > 0:

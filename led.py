@@ -17,13 +17,16 @@
     You should have received a copy of the GNU General Public License
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
+
+import RPi.GPIO as GPIO
+from configparser import RawConfigParser
+
 '''
 Switch a LED on (and leave it on). This is useful as a status signal whether
 the Raspberry Pi is still working or has finished the shutdown sequence.
 At shutdown, all GPIO ports are reconfigured as input, and the LED goes out.
 '''
-import RPi.GPIO as GPIO
-from ConfigParser import RawConfigParser
+
 config = RawConfigParser()
 config.read('fancontrol.cfg')
 led_pin = config.getint('pins', 'led')

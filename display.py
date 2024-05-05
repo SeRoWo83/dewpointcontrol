@@ -19,23 +19,23 @@
 """
 
 import atexit
-import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-else:
-    from configparser import RawConfigParser
+from time import struct_time
+from dataclasses import dataclass
+
+from configparser import RawConfigParser
 import os
 import pygame
 import shutil
 import time
 from itertools import count
+from numpy import NaN
 
 from component import Component
 
 DEBUG = False
 
 os.environ["SDL_FBDEV"] = "/dev/fb1"
-os.environ['SDL_VIDEODRIVER']="fbcon"
+os.environ['SDL_VIDEODRIVER'] = "fbcon"
 
 fontname = 'Droid Sans'
 
@@ -45,11 +45,13 @@ config = RawConfigParser()
 config.read('fancontrol.cfg')
 endscreen_raw = config.get('screenshot', 'endscreen_raw')
 
-def display_endscreen():
+
+def display_end_screen() -> None:
     pygame.quit()
     shutil.copyfile(endscreen_raw, '/dev/fb1')
 
-atexit.register(display_endscreen)
+
+atexit.register(display_end_screen)
 
 WHITE = (255, 255, 255)
 YELLOW = (255, 255, 140)

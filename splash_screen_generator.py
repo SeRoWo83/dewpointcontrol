@@ -22,7 +22,7 @@ import os
 import pygame
 
 os.environ["SDL_FBDEV"] = "/dev/fb1"
-os.environ['SDL_VIDEODRIVER']="fbcon"
+os.environ['SDL_VIDEODRIVER'] = "fbcon"
 
 fontname = 'Droid Sans'
 
@@ -37,22 +37,22 @@ size = width, height = sizes[0]
 print('Initialize display...')
 screen = pygame.display.set_mode(size)
 print('Done.')
-screen.fill((255,255,255))
+screen.fill((255, 255, 255))
 font = pygame.font.SysFont(fontname, fontsize)
 
-text = font.render(u'Taupunkt-', True, (0,0,0))
+text = font.render(u'Taupunkt-', True, (0, 0, 0))
 textpos = text.get_rect()
 textpos.top = 4
 textpos.left = 2
 screen.blit(text, textpos)
 
-text = font.render(u'Lüftungssteuerung', True, (0,0,0))
+text = font.render(u'Lüftungssteuerung', True, (0, 0, 0))
 textpos = text.get_rect()
 textpos.top = 4 + 20
 textpos.left = 2
 screen.blit(text, textpos)
 
-text = font.render(u'© Daniel Müllner', True, (0,0,0))
+text = font.render(u'© Daniel Müllner', True, (0, 0, 0))
 textpos = text.get_rect()
 textpos.top = 4 + 2 * 20 + 10
 textpos.left = 2

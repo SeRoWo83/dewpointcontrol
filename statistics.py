@@ -18,10 +18,8 @@
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 import sys
-if sys.hexversion < 0x03000000:
-    from ConfigParser import RawConfigParser
-else:
-    from configparser import RawConfigParser
+
+from configparser import RawConfigParser
 from lxml import etree
 import os
 import shutil
