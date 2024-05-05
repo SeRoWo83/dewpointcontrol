@@ -101,6 +101,7 @@ class ShtComms:
         self.reset_connection()
 
     def __del__(self) -> None:
+        print("GPIO uninitialized")
         GPIO.cleanup([self.pin_sck, self.pin_data])
 
     def _data_set(self, v: int) -> None:
@@ -227,9 +228,15 @@ class Sht(ShtComms):
             # Table 8, C
             voltages = (2.5, 3.0, 3.5, 4.0, 5.0)
             d1_ = (-39.4, -39.6, -39.7, -39.8, -40.1)
-            assert voltage >= voltages[0]
+            assert voltage >= voltages[0]  # TODO: get rid of all assertions outside test code
             assert voltage <= voltages[-1]
-            return interp(voltage, voltages, d1_)
+            y = interp(voltage, voltages, d1_)
+            if not isinstance(y, float):  # TODO: find a way to better assure float 
+                warn_str = f"{y} is not a float. Using first value!"
+                print(warn_str)
+                logger.warning(warn_str)
+                y = y[0]
+            return y
 
         d2 = 0.01  # Table 8, C/14b
         c1, c2, c3 = -2.0468, 0.0367, -1.5955e-6  # Table 6, 12b
@@ -315,3 +322,4 @@ class Sensor:
 if __name__ == '__main__':
     GPIO.setmode(GPIO.BOARD)
     my_sens1, my_sens2 = Sensor(7, 11), Sensor(13, 15)
+    print(my_sens1.sht.C.compute_d1(3.513))

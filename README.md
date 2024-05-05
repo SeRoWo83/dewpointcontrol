@@ -41,7 +41,7 @@ The heart of the controller is the message board. All information flow is direct
 ##### Helper modules
 * [ip.py](ip.py): Determine the computer's local and public IP addresses.
 * [shutdown.py](shutdown.py): Shut the computer down.
-* [signals_handler.py](signals_handler.py): Handler for Unix signals to allow graceful termination (e.g., close the window before the controller terminates).
+* [signalshandler.py](signalshandler.py): Handler for Unix signals to allow graceful termination (e.g., close the window before the controller terminates).
 * [uptime.py](uptime.py): Determine the uptime of the computer. All time intervals in the controller software are measured by uptime diffences, except the logging timestamps. Uptime has the advantage that it is never adjusted, so the controller is not confused when the real-time clock (Unix time) is adjusted.
 * [rwlock.py](rwlock.py): Two different reader-writer locks, used by the message board.
 
