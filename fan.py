@@ -78,7 +78,7 @@ class Fan(Component):
             self.message_board.post('FanComment', 'Not enough samples for average.')
             return False
 
-        if s1_data.tau - s2_data.tau < 1:
+        if s1_data.dewpoint - s2_data.dewpoint < 1:
             self.message_board.post('FanComment', 'High outside dew point.')
             self.stayOffUntil = uptime + 20 * 60
             return False

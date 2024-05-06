@@ -24,7 +24,6 @@
 """
 
 from __future__ import print_function
-from dataclasses import dataclass
 import logging
 import math
 import sys
@@ -33,6 +32,7 @@ import RPi.GPIO as GPIO
 from numpy import NaN, interp
 
 from uptime import uptime
+from misc import SensorData
 
 logger = logging.getLogger('fancontrol')
 
@@ -231,7 +231,7 @@ class Sht(ShtComms):
             assert voltage >= voltages[0]  # TODO: get rid of all assertions outside test code
             assert voltage <= voltages[-1]
             y = interp(voltage, voltages, d1_)
-            if not isinstance(y, float):  # TODO: find a way to better assure float 
+            if not isinstance(y, float):  # TODO: find a way to better assure float
                 warn_str = f"{y} is not a float. Using first value!"
                 print(warn_str)
                 logger.warning(warn_str)
@@ -272,28 +272,20 @@ class Sht(ShtComms):
         rh_linear = self.C.c1 + self.C.c2 * rh_raw + self.C.c3 * rh_raw ** 2  # ch 4.1
         return (t - 25.0) * (self.C.t1 + self.C.t2 * rh_raw) + rh_linear  # ch 4.2
 
-    def read_dew_point(self, t: float | None = None, rh: float | None = None) -> float:
+    def calculate_dew_point(self, temperature: float | None = None, humidity: float | None = None) -> float:
         """With t and rh provided, does not access the hardware."""
-        if t is None:
-            t, rh = self.read_t(), None
-        if rh is None:
-            rh = self.read_rh(t)
-        t_range = 'water' if t >= 0 else 'ice'
+        if temperature is None:
+            temperature, humidity = self.read_t(), None
+        if humidity is None:
+            humidity = self.read_rh(temperature)
+        t_range = 'water' if temperature >= 0 else 'ice'
         tn, m = self.C.tn[t_range], self.C.m[t_range]
         return (  # ch 4.4
-                tn * (math.log(rh / 100.0) + (m * t) / (tn + t)) /
-                (m - math.log(rh / 100.0) - m * t / (tn + t)))
+                tn * (math.log(humidity / 100.0) + (m * temperature) / (tn + temperature)) /
+                (m - math.log(humidity / 100.0) - m * temperature / (tn + temperature)))
 
 
 # Wrapper for the sensor functions
-
-
-@dataclass
-class SensorData:
-    humidity: float = NaN
-    temperature: float = NaN
-    tau: float = NaN
-    error: bool = False
 
 
 class Sensor:
@@ -301,22 +293,23 @@ class Sensor:
         self.sht = Sht(clock, data, voltage=3.3)
         self.humidity = NaN
         self.temperature = NaN
-        self.tau = NaN
+        self.dewpoint = NaN
         self.error: bool = False
 
     def read(self) -> SensorData:
         try:
             self.temperature = self.sht.read_t()
             self.humidity = self.sht.read_rh(self.temperature)
-            self.tau = self.sht.read_dew_point(self.temperature, self.humidity)
+            self.dewpoint = self.sht.calculate_dew_point(self.temperature, self.humidity)
             self.error = False
         except (ShtCommFailure, ShtCRCCheckError) as e:
             logger.warning(f'Error, {e}')
             self.sht.reset_connection()
-            self.temperature, self.humidity, self.tau = NaN, NaN, NaN
+            self.temperature, self.humidity, self.dewpoint = NaN, NaN, NaN
             self.error = True
 
-        return SensorData(humidity=self.humidity, temperature=self.temperature, tau=self.tau, error=self.error)
+        return SensorData(humidity=self.humidity, temperature=self.temperature,
+                          dewpoint=self.dewpoint, error=self.error)
 
 
 if __name__ == '__main__':

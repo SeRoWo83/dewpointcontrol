@@ -56,7 +56,7 @@ def css_style(x: SensorData) -> SensorData:
     c = SensorData()
     c.rH = '' if isnan(x.humidity) else COLOR_RED
     c.T = '' if isnan(x.temperature) else COLOR_RED
-    c.tau = '' if isnan(x.tau) else COLOR_RED
+    c.dewpoint = '' if isnan(x.dewpoint) else COLOR_RED
     return c
 
 
@@ -71,8 +71,8 @@ class PageGenerator:
         self.set_mode(None)
         self.set_fan_state(None)
         self.last_sync = None
-        self.sense1: SensorData = SensorData(temperature=NaN, tau=NaN, humidity=NaN)
-        self.sense2: SensorData = SensorData(temperature=NaN, tau=NaN, humidity=NaN)
+        self.sense1: SensorData = SensorData(temperature=NaN, dewpoint=NaN, humidity=NaN)
+        self.sense2: SensorData = SensorData(temperature=NaN, dewpoint=NaN, humidity=NaN)
 
         self.fan_state_txt: str = 'Fan state: unknown.'
         self.fan_state_style: str = COLOR_RED
@@ -183,11 +183,11 @@ td.r {{text-align:right;}}
     <td>
       Dew point in °C
     </td>
-    <td class="c" style="{css_style(self.sense1).tau}">
-      {pretty_print(self.sense1.tau)}
+    <td class="c" style="{css_style(self.sense1).dewpoint}">
+      {pretty_print(self.sense1.dewpoint)}
     </td>
-    <td class="c" style="{css_style(self.sense2).tau}">
-      {pretty_print(self.sense2.tau)}
+    <td class="c" style="{css_style(self.sense2).dewpoint}">
+      {pretty_print(self.sense2.dewpoint)}
     </td>
   </tr>
   <tr>
@@ -251,10 +251,10 @@ td.r {{text-align:right;}}
 {pretty_print(self.sense1.temperature)}
 {css_style(self.sense2).temperature}
 {pretty_print(self.sense2.temperature)}
-{css_style(self.sense1).tau}
-{pretty_print(self.sense1.tau)}
-{css_style(self.sense2).tau}
-{pretty_print(self.sense2.tau)}
+{css_style(self.sense1).dewpoint}
+{pretty_print(self.sense1.dewpoint)}
+{css_style(self.sense2).dewpoint}
+{pretty_print(self.sense2.dewpoint)}
 {self.fan_state_style}
 {self.mode_txt}{self.fan_state_txt}
 {self.status_style}

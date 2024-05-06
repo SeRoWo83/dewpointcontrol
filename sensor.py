@@ -81,8 +81,8 @@ class Sensor(ComponentWithThread):
                 s2_data = self.S2.read()
                 self.message_board.post('Measurement', (self.uptime, s1_data, s2_data))
                 logger.info(CSV('measurement',
-                                s1_data.humidity, s1_data.temperature, s1_data.tau, s1_data.error,
-                                s2_data.humidity, s2_data.temperature, s2_data.tau, s2_data.error))
+                                s1_data.humidity, s1_data.temperature, s1_data.dewpoint, s1_data.error,
+                                s2_data.humidity, s2_data.temperature, s2_data.dewpoint, s2_data.error))
 
 
 if __name__ == '__main__':

@@ -20,7 +20,6 @@
 
 import atexit
 from time import struct_time
-from dataclasses import dataclass
 from typing import Self
 
 from configparser import RawConfigParser
@@ -29,10 +28,10 @@ import pygame
 import shutil
 import time
 from itertools import count
-from numpy import NaN
 
 from component import Component
 from messageboard import MessageBoard
+from misc import SensorData
 
 DEBUG = False
 
@@ -62,14 +61,6 @@ STATUSBG = (230, 230, 230)
 icon_offline = pygame.image.load('/usr/share/icons/HighContrast/16x16/status/network-error.png')
 icon_online = pygame.image.load('/usr/share/icons/HighContrast/16x16/status/network-idle.png')
 icon_unknown = pygame.image.load('/usr/share/icons/HighContrast/16x16/status/network-no-route.png')
-
-
-@dataclass
-class SensorData:
-    humidity: float = NaN
-    temperature: float = NaN
-    tau: float = NaN
-    error: bool = False
 
 
 class Screen:
@@ -154,10 +145,10 @@ class Screen:
     def set_measurements(self, sensor1: SensorData, sensor2: SensorData):
         self.rH1 = sensor1.humidity
         self.T1 = sensor1.temperature
-        self.tau1 = sensor1.tau
+        self.tau1 = sensor1.dewpoint
         self.rH2 = sensor2.humidity
         self.T2 = sensor2.temperature
-        self.tau2 = sensor2.tau
+        self.tau2 = sensor2.dewpoint
 
     def get_fanstate(self) -> tuple[str, tuple[int, int, int]]:
         fanstate = self.message_board.query('FanState')

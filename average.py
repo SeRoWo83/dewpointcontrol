@@ -22,8 +22,6 @@ from collections import deque
 import logging
 from typing import Self
 
-from numpy import NaN
-
 from component import Component
 from sht75 import SensorData
 from uptime import uptime as global_uptime
@@ -51,38 +49,38 @@ class Average(Component):
             uptime0 = global_uptime()
             timespan = message
 
-            T1 = 0
-            rH1 = 0
-            tau1 = 0
-            count1 = 0
-            T2 = 0
-            rH2 = 0
-            tau2 = 0
-            count2 = 0
+            temperature1: float = 0.0
+            temperature2: float = 0
+            humidity1: float = 0.0
+            humidity2: float = 0
+            dewpoint1: float = 0.0
+            dewpoint2: float = 0
+            count1: int = 0
+            count2: int = 0
 
             for uptime, s1_data, s2_data in self.deque:
                 assert uptime <= uptime0
                 if uptime0 - uptime > timespan:
                     break
                 if not s1_data.error:
-                    T1 += s1_data.temperature
-                    rH1 += s1_data.humidity
-                    tau1 += s1_data.tau
+                    temperature1 += s1_data.temperature
+                    humidity1 += s1_data.humidity
+                    dewpoint1 += s1_data.dewpoint
                     count1 += 1
                 if not s2_data.error:
-                    T2 += s2_data.temperature
-                    rH2 += s2_data.humidity
-                    tau2 += s2_data.tau
+                    temperature2 += s2_data.temperature
+                    humidity2 += s2_data.humidity
+                    dewpoint2 += s2_data.dewpoint
                     count2 += 1
             if count1 > 0:
-                T1 /= count1
-                rH1 /= count1
-                tau1 /= count1
-            error1 = count1 < max(1, timespan / 20)
+                temperature1 /= count1
+                humidity1 /= count1
+                dewpoint1 /= count1
+            error1 = count1 < max(1.0, timespan / 20)
             if count2 > 0:
-                T2 /= count2
-                rH2 /= count2
-                tau2 /= count2
-            error2 = count2 < max(1, timespan / 20)
-            return (SensorData(humidity=rH1, temperature=T1, tau=tau1, error=error1),
-                    SensorData(humidity=rH2, temperature=T2, tau=tau2, error=error2))
+                temperature2 /= count2
+                humidity2 /= count2
+                dewpoint2 /= count2
+            error2 = count2 < max(1.0, timespan / 20)
+            return (SensorData(humidity=humidity1, temperature=temperature1, dewpoint=dewpoint1, error=error1),
+                    SensorData(humidity=humidity2, temperature=temperature2, dewpoint=dewpoint2, error=error2))
