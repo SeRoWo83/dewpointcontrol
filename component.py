@@ -20,6 +20,7 @@
 
 from threading import Lock, Thread
 import logging
+from typing import Self
 
 from messageboard import message_board as my_message_board, MessageBoard
 from shutdown import shutdown
@@ -34,7 +35,7 @@ class Component:
         self.name = name
         self.lock = Lock()
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
@@ -48,7 +49,7 @@ class ComponentWithThread(Component):
         super().__init__(name)
         self.thread = Thread(target=self.__run, name=self.name)
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         self.thread.start()
         threadManager.add_thread(self)
         return super().__enter__()

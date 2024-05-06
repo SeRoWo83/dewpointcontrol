@@ -22,8 +22,10 @@ from configparser import RawConfigParser
 from datetime import datetime
 import logging
 from threading import Event
+from typing import Self
 
 import dbus
+from dbus.exceptions import DBusException
 
 from component import Component, ComponentWithThread
 from uptime import uptime
@@ -46,7 +48,7 @@ class RestartWLAN(Component):
     def __init__(self) -> None:
         super().__init__('restartWLAN')
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         with self.lock:
             self.message_board.subscribe('RestartWLAN', self, RestartWLAN.on_reset_wlan)
         return super().__enter__()
@@ -54,10 +56,14 @@ class RestartWLAN(Component):
     def on_reset_wlan(self, message: bool) -> None:
         assert message is True
         with self.lock:
-            sys_bus = dbus.SystemBus()
-            systemd1 = sys_bus.get_object('org.freedesktop.systemd1', '/org/freedesktop/systemd1')
-            manager = dbus.Interface(systemd1, 'org.freedesktop.systemd1.Manager')
-            job = manager.RestartUnit('netctl@ts3.service', 'fail')
+            try:
+                sys_bus = dbus.SystemBus()
+                systemd1 = sys_bus.get_object('org.freedesktop.systemd1', '/org/freedesktop/systemd1')
+                manager = dbus.Interface(systemd1, 'org.freedesktop.systemd1.Manager')
+                # _job = manager.RestartUnit('netctl@ts3.service', 'fail')  # arch linux!
+                _job = manager.RestartUnit('NetworkManager.service', 'fail')  # noqa TODO: look what the arch line did and if this is equivalent
+            except DBusException as dbus_except:
+                print(f"{dbus_except.get_dbus_message()=}")
 
 
 class CheckNetwork(ComponentWithThread):
@@ -68,7 +74,7 @@ class CheckNetwork(ComponentWithThread):
         self.last_measurement: float = ut
         self.uptime: float = ut
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         self.message_board.subscribe('Time', self, CheckNetwork.on_time)
         return super().__enter__()
 
@@ -98,3 +104,14 @@ class CheckNetwork(ComponentWithThread):
                 online = self.check_network()
                 self.message_board.post('Network', online)
                 # logger.info(CSV('network', online))
+
+
+if __name__ == '__main__':
+    from time import sleep
+    from messageboard import message_board
+    print(f"{message_board.query('ExitThread')=}")
+    with CheckNetwork() as check_net, RestartWLAN() as rest_wlan:
+        print(f"{check_net.check_network()=}")
+        rest_wlan.on_reset_wlan(True)
+        sleep(2)
+        message_board.post('ExitThread', True)
