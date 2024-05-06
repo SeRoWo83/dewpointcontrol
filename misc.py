@@ -31,3 +31,7 @@ def delay(seconds: float) -> None:
         sleep(sleep_time)
         time1 = uptime()
         sleep_time = seconds + time0 - time1
+
+
+if __name__ == '__main__':
+    print(CSV('test', delay(3)))

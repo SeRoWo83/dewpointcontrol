@@ -169,9 +169,11 @@ class InfoScreen:
         self.display()
 
     def select(self, pin: int) -> None:
+        # Dummy
         pass
 
     def leave(self) -> None:
+        # Dummy
         pass
 
 
@@ -276,6 +278,7 @@ class MainMenu:
                 self.message_board.post('Shutdown', True)
 
     def leave(self) -> None:
+        # Dummy
         pass
 
 
@@ -296,6 +299,7 @@ class MainScreen:
         return MainMenu(self.message_board)
 
     def leave(self) -> None:
+        # Dummy
         pass
 
 

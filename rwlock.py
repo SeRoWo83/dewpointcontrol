@@ -54,6 +54,23 @@ class _LockInterface:
         self.read_access = _LockInterface.__ReadAccess(self)
         self.write_access = _LockInterface.__WriteAccess(self)
 
+    def acquire_read(self) -> None:
+        # Dummy
+        pass
+
+    def release_read(self) -> None:
+        # Dummy
+        pass
+
+    def acquire_write(self) -> None:
+        # Dummy
+        pass
+
+    def release_write(self) -> None:
+        # Dummy
+        pass
+
+
 class RWLock(_LockInterface):
     """Synchronization object used in a solution of so-called second
     readers-writers problem. In this problem, many readers can simultaneously

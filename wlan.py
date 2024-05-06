@@ -103,7 +103,7 @@ class CheckNetwork(ComponentWithThread):
                 delay(wait)
                 online = self.check_network()
                 self.message_board.post('Network', online)
-                # logger.info(CSV('network', online))
+                logger.info(CSV('network', online))
 
 
 if __name__ == '__main__':

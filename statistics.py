@@ -100,7 +100,7 @@ def last_on_time(date: date_t, start_timestamp: float) -> float | None:
     return last_on_timestamp
 
 
-def read_log(*date: tuple[int, int, int]) -> tuple[..., ..., float, float, ...]:
+def read_log(*date: int) -> tuple[..., ..., float, float, ...]:
     date = datetime.date(*date)
     logfile = config.get('logging', 'logfile')
     if date != today:
