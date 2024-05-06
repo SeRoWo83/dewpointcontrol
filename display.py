@@ -21,6 +21,7 @@
 import atexit
 from time import struct_time
 from dataclasses import dataclass
+from typing import Self
 
 from configparser import RawConfigParser
 import os
@@ -269,7 +270,7 @@ class Display(Component):
         self.screen = Screen(self.message_board)
         self.screen.show_startscreen()
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         with self.lock:
             self.message_board.subscribe('Measurement', self, Display.on_measurement)
             self.message_board.subscribe('Time', self, Display.on_time)

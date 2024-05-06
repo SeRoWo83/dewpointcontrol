@@ -22,6 +22,7 @@ import logging
 from math import expm1
 from time import struct_time
 from configparser import RawConfigParser
+from typing import Self
 
 from component import Component
 
@@ -43,7 +44,7 @@ class Fan(Component):
         self.stayOnUntil = 0
         self.stayOffUntil = 0
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         with self.lock:
             self.message_board.subscribe('Mode', self, Fan.on_mode)
             self.message_board.subscribe('Time', self, Fan.on_time)

@@ -24,7 +24,7 @@ import logging
 import psutil
 import RPi.GPIO as GPIO
 import time
-from typing import Callable, Any
+from typing import Self, Callable, Any
 
 from component import Component
 from ip import get_ip_address
@@ -48,7 +48,7 @@ class ButtonController:
         self.message_board = message_board
         self.buttons = []
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
@@ -77,7 +77,7 @@ class Menu(Component):
         self.menus: list[MainScreen | MainMenu] = [MainScreen(self.message_board)]
         self.menus[-1].display()
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         with self.lock:
             self.button_controller = ButtonController(self.message_board)
             self.button_controller.__enter__()

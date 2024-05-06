@@ -24,6 +24,7 @@ import datetime
 import os
 import shutil
 import time
+from typing import Self
 
 from numpy import isnan, NaN
 
@@ -299,7 +300,7 @@ class HtmlWriter(Component):
         self.pageGenerator = PageGenerator()
         self.status_old = (None, None)
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         with self.lock:
             self.message_board.subscribe('Measurement', self, HtmlWriter.on_measurement)
             self.message_board.subscribe('HTMLStatus', self, HtmlWriter.on_html_status)

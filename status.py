@@ -18,7 +18,7 @@
     along with this program. If not, see <https://www.gnu.org/licenses/>.
 """
 
-from typing import Any
+from typing import Any, Self
 from sht75 import SensorData
 from component import Component
 
@@ -40,7 +40,7 @@ class Status(Component):
         self.ip_address = None
         self.last_html_status = None
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         with self.lock:
             self.message_board.subscribe('Measurement', self, Status.on_measurement)
             self.message_board.subscribe('StatusProcessed', self, Status.on_status_processed)

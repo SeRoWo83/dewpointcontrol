@@ -21,6 +21,7 @@
 import atexit
 from configparser import RawConfigParser
 from queue import Queue, Empty
+from typing import Self
 
 import RPi.GPIO as GPIO
 
@@ -63,7 +64,7 @@ class Devices(ComponentWithThread):
         if CLOSE_WINDOW:
             self.on_devices('VentilationOff')
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         with self.lock:
             self.message_board.subscribe('Devices', self, Devices.on_devices)
         return super().__enter__()

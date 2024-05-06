@@ -23,6 +23,7 @@ from time import struct_time
 from configparser import RawConfigParser
 from datetime import datetime
 from threading import Event
+from typing import Self
 
 import sht75
 from uptime import uptime
@@ -53,7 +54,7 @@ class Sensor(ComponentWithThread):
         self.last_measurement = ut
         self.uptime = ut
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         self.message_board.subscribe('Time', self, Sensor.on_time)
         return super().__enter__()
 

@@ -20,6 +20,7 @@
 
 from collections import deque
 import logging
+from typing import Self
 
 from numpy import NaN
 
@@ -35,7 +36,7 @@ class Average(Component):
         super().__init__('average')
         self.deque = deque(maxlen=9000)  # enough for 24h
 
-    def __enter__(self) -> object:
+    def __enter__(self) -> Self:
         with self.lock:
             self.message_board.subscribe('Measurement', self, Average.on_measurement)
             self.message_board.subscribe('Average', self, Average.on_average)
